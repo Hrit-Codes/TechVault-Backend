@@ -2,6 +2,7 @@ import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterRequestDto } from './dto/register-request.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import type { LoginRequestDto } from './dto/login-request.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -18,4 +19,5 @@ export class AuthController {
   async verifyAndRegister(@Body() dto: VerifyOtpDto) {
     return this.authService.completeRegistration(dto);
   }
+
 }

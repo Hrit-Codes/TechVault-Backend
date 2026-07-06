@@ -15,6 +15,12 @@ export class UsersService {
     });
   }
 
+  async findByEmail(email:string){
+    return this.prisma.user.findFirst({
+      where:{email:email}
+    })
+  }
+
   async createUser(data: RegisterRequestDto) {
     const hashedPassword = await argon2.hash(data.password, {
       type: argon2.argon2id,
