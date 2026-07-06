@@ -2,7 +2,7 @@ import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterRequestDto } from './dto/register-request.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
-import type { LoginRequestDto } from './dto/login-request.dto';
+import { LoginRequestDto } from './dto/login-request.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -20,4 +20,21 @@ export class AuthController {
     return this.authService.completeRegistration(dto);
   }
 
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() dto:LoginRequestDto){
+    return this.authService.loginUser(dto)
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() body:{ userId:string, refreshToken:string}){
+    return this.authService.refreshTokens(body.userId, body.refreshToken);
+  }
+
+  @Post("logout")
+  @HttpCode(HttpStatus.OK)
+  async logout(@Body() body:{userId:string}){
+    return this.authService.logout(body.userId);
+  }
 }
