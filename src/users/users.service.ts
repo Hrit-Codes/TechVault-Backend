@@ -16,7 +16,6 @@ export class UsersService {
   }
 
   async createUser(data: RegisterRequestDto) {
-    // Hash using Argon2id with standard safe default profiles
     const hashedPassword = await argon2.hash(data.password, {
       type: argon2.argon2id,
       memoryCost: 2 ** 16, // 64 MB

@@ -6,13 +6,29 @@ export const otpEmailTemplate = (otp: string, fullName?: string): string => {
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
         <title>Verify Your TechVault Account</title>
+        <style>
+            /* Light theme defaults (--color-section / --color-section-alternative / --color-description) */
+            body, .bg-section-alt { background-color:#f3f4f6 !important; }
+            .bg-section { background-color:#ffffff !important; }
+            .text-desc { color:#374151 !important; }
+            .divider { border-color:#f3f4f6 !important; }
+
+            /* Dark theme overrides, mirrors the frontend's .dark theme tokens */
+            @media (prefers-color-scheme: dark) {
+                body, .bg-section-alt { background-color:#101829 !important; }
+                .bg-section { background-color:#0b0f19 !important; }
+                .text-desc { color:#d1d5db !important; }
+                .heading { color:#f9fafb !important; }
+                .divider { border-color:#1f2937 !important; }
+            }
+        </style>
     </head>
-    <body style="margin:0; padding:0; background-color:#f3f4f6; font-family: 'Inter', Arial, sans-serif;">
+    <body class="bg-section-alt" style="margin:0; padding:0; background-color:#f3f4f6; font-family: 'Inter', Arial, sans-serif;">
 
         <table width="100%" cellpadding="0" cellspacing="0" style="padding: 48px 16px;">
             <tr>
                 <td align="center">
-                    <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:20px; overflow:hidden; box-shadow:0 4px 32px rgba(0,0,0,0.08);">
+                    <table width="520" cellpadding="0" cellspacing="0" class="bg-section" style="background:#ffffff; border-radius:20px; overflow:hidden; box-shadow:0 4px 32px rgba(0,0,0,0.08);">
 
                         <!-- Header -->
                         <tr>
@@ -28,7 +44,7 @@ export const otpEmailTemplate = (otp: string, fullName?: string): string => {
                                             </p>
                                         </td>
                                         <td align="right">
-                                            <div style="background:rgba(255,255,255,0.15); border-radius:12px; padding:8px 14px;">
+                                            <div style="background:rgba(56,189,248,0.25); border:1px solid rgba(186,230,253,0.5); border-radius:12px; padding:8px 14px;">
                                                 <span style="color:#ffffff; font-size:12px; font-weight:600;">
                                                     Email Verification
                                                 </span>
@@ -44,10 +60,10 @@ export const otpEmailTemplate = (otp: string, fullName?: string): string => {
                             <td style="padding:40px;">
 
                                 <!-- Greeting -->
-                                <h2 style="margin:0 0 8px; color:#111827; font-size:22px; font-weight:600;">
+                                <h2 class="heading" style="margin:0 0 8px; color:#111827; font-size:22px; font-weight:600;">
                                     Verify Your Email
                                 </h2>
-                                <p style="margin:0 0 28px; color:#6b7280; font-size:14px; line-height:1.7;">
+                                <p class="text-desc" style="margin:0 0 28px; color:#374151; font-size:14px; line-height:1.7;">
                                     Hi <strong style="color:#111827;">${fullName ?? "there"}</strong>,<br/>
                                     Thank you for signing up with TechVault. Use the code below to verify your email address and activate your account.
                                 </p>
@@ -72,8 +88,8 @@ export const otpEmailTemplate = (otp: string, fullName?: string): string => {
                                 <!-- Warning -->
                                 <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
                                     <tr>
-                                        <td style="background:#f9fafb; border-left:3px solid #f97316; border-radius:0 8px 8px 0; padding:14px 16px;">
-                                            <p style="margin:0; color:#6b7280; font-size:13px; line-height:1.6;">
+                                        <td style="background:#f0f9ff; border-left:3px solid #0ea5e9; border-radius:0 8px 8px 0; padding:14px 16px;">
+                                            <p class="text-desc" style="margin:0; color:#374151; font-size:13px; line-height:1.6;">
                                                 🔒 <strong>Never share this code</strong> with anyone. TechVault will never ask for your OTP via phone or email.
                                             </p>
                                         </td>
@@ -90,7 +106,7 @@ export const otpEmailTemplate = (otp: string, fullName?: string): string => {
                         <!-- Divider -->
                         <tr>
                             <td style="padding:0 40px;">
-                                <div style="border-top:1px solid #f3f4f6;"></div>
+                                <div class="divider" style="border-top:1px solid #f3f4f6;"></div>
                             </td>
                         </tr>
 
@@ -106,7 +122,7 @@ export const otpEmailTemplate = (otp: string, fullName?: string): string => {
                                             </p>
                                         </td>
                                         <td align="right">
-                                            <a href="#" style="color:#f97316; font-size:12px; text-decoration:none; font-weight:500;">
+                                            <a href="#" style="color:#0ea5e9; font-size:12px; text-decoration:none; font-weight:500;">
                                                 Unsubscribe
                                             </a>
                                         </td>
