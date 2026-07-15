@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
-import type { RegisterRequestDto } from '../auth/dto/register-request.dto';
+import { RegisterRequestDto } from '../auth/dto/register-request.dto';
 
 @Injectable()
 export class UsersService {
@@ -28,6 +28,8 @@ export class UsersService {
   }
 
   async verifyPassword(email:string, password:string):Promise<any>{
+    console.log("Email received:",email);
+    console.log("Password received:",password);
     const user= await this.prisma.user.findFirst({
       where:{ email },
       select:{
