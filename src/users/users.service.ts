@@ -1,11 +1,18 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
 import { RegisterRequestDto } from '../auth/dto/register-request.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { IPagination } from '../types/pagination.types';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinaryService:CloudinaryService,
+  ) {}
 
   async findByEmailOrPhone(email: string, phoneNumber: string) {
     return this.prisma.user.findFirst({
@@ -137,4 +144,213 @@ export class UsersService {
     return userWithoutToken;
   }
 
+  async updateAvatar(userId:string, file:Express.Multer.File):Promise<any>{
+    const user= await this.prisma.user.findUnique({
+      where:{id:userId},
+      select:{id:true,avatar:true}
+    });
+
+    if(!user) throw new NotFoundException("User not found");
+
+    if(user.avatar){
+      const publicId=user.avatar.split('/').pop()?.split(`.`)[0];
+      if(publicId){
+        await this.cloudinaryService.deleteImage(`techvault/avatars/${publicId}`);
+      }
+    }
+    const result=await this.cloudinaryService.uploadAvatar(file);
+
+    const updatedUser=await this.prisma.user.update({
+      where:{id:userId},
+      data:{avatar:result.secure_url},
+      select:{id:true, fullName:true, email:true, avatar:true}
+    })
+
+    return{
+      message:"Avatar updated successfully",
+      user:updatedUser
+    }
+  }
+
+  async updateProfile(userId:string,dto:UpdateProfileDto):Promise<any>{
+    const user= await this.prisma.user.findUnique({
+      where:{id:userId},
+    });
+      if (!user) throw new NotFoundException("User not found");
+
+      if(user.role==="ADMIN" && dto.defaultAddress){
+        throw new BadRequestException("Admins cannot set a default address");
+      }
+
+      if(dto.phoneNumber){
+        const existingPhone= await this.prisma.user.findFirst({
+          where:{phoneNumber:dto.phoneNumber, NOT:{id:userId}}
+        });
+
+        if(existingPhone){
+          throw new ConflictException("Phone number is already in use");
+        }
+      }
+
+      const updatedUser= await this.prisma.user.update({
+        where:{id:userId},
+        data:{
+          ...(dto.fullName && {fullName:dto.fullName}),
+          ...(dto.phoneNumber && { phoneNumber:dto.phoneNumber}),
+          ...(dto.defaultAddress && { defaultAddress: { ...dto.defaultAddress}})
+        },
+        select:{
+          id:true,
+          fullName:true,
+          email:true,
+          phoneNumber:true,
+          defaultAddress:true,
+          avatar:true,
+        }
+      });
+
+      return {
+        message:'Profile updated successfully',
+        user:updatedUser
+      }
+  }
+
+  async updatePassword(userId:string, dto:ChangePasswordDto):Promise<any>{
+    const user= await this.prisma.user.findUnique({
+      where:{id:userId}
+    })
+
+    if(!user)
+      throw new NotFoundException("User not found");
+
+    const isOldPasswordValid= await argon2.verify(user.password, dto.oldPassword);
+
+    if(!isOldPasswordValid){
+      throw new UnauthorizedException("Old password is incorrect");
+    };
+
+    const hashedNewPassword= await argon2.hash(dto.newPassword,{
+      type:argon2.argon2id,
+      memoryCost:2**16,
+      timeCost:3,
+      parallelism:4
+    });
+
+    await this.prisma.user.update({
+      where:{id:userId},
+      data:{password:hashedNewPassword}
+    });
+
+    return { message:"Password changed successfully"}
+  }
+
+  async deleteAccount(userId:string):Promise<any>{
+    const user= await this.prisma.user.findUnique({
+      where:{id:userId}
+    })
+
+    if(!user) throw new NotFoundException("User not found");
+
+    if(user.role==="ADMIN"){
+      throw new BadRequestException("Admin accounts cannot be deleted");
+    }
+
+    await this.prisma.user.delete({
+      where:{id:userId}
+    });
+
+    return {
+      message:"Account deleted successfully."
+    }
+  }
+
+  async getProfile(userId:string):Promise<any>{
+    const user=await this.prisma.user.findUnique({
+      where:{id:userId},
+      select:{
+        id:true,
+        fullName:true,
+        email:true,
+        phoneNumber:true,
+        defaultAddress:true,
+        avatar:true,
+        role:true,
+        isVerified:true,
+        lastLogin:true,
+        createdAt:true,
+        updatedAt:true
+
+      }
+    });
+
+    if(!user) throw new NotFoundException("User not found");
+
+    return user;
+  }
+
+  async getAllUsers(
+    page:number=1,
+    limit:number=10,
+    isActive?:boolean,
+  ):Promise<{
+    users:any[];
+    pagination:IPagination;
+  }>{
+    const skip=(page-1)*limit;
+    const where:any={};
+    
+    if(isActive!==undefined){
+      where.isActive=isActive;
+    }
+
+    const [total,users]=await Promise.all([
+      this.prisma.user.count({where}),
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take:limit,
+        orderBy:{createdAt:'desc'},
+        omit:{
+          password:true,
+          refreshToken:true
+        }
+      })
+    ]);
+
+    const totalPages=Math.ceil(total/limit);
+    const hasNextPage=page<totalPages;
+    const hasPrevPage=page>1;
+
+    return{
+      users,
+      pagination:{
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage,
+        hasPrevPage
+      }
+    }
+  }
+
+  async toggleUserActive(userId:string):Promise<any>{
+    const user= await this.prisma.user.findUnique({
+      where:{id:userId}
+    })
+
+    if(!user) throw new NotFoundException("User not found");
+
+    await this.prisma.user.update({
+      where:{id:userId},
+      data:{
+        isActive:!user.isActive,
+        refreshToken:null // clear session-
+      }
+    });
+
+    return {
+      message:`Account ${user.isActive?"deactivated":"activated"} successfully.`
+    }
+  }
 }

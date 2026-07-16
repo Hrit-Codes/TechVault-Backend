@@ -37,4 +37,5 @@ export class AuthController {
   async logout(@Body() body:{userId:string}){
     return this.authService.logout(body.userId);
   }
+
 }
