@@ -1,4 +1,4 @@
-import { ConflictException, BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, BadRequestException, Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { OtpService } from '../otp/otp.service';
 import { RegisterRequestDto } from './dto/register-request.dto';
@@ -6,6 +6,9 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginRequestDto } from './dto/login-request.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import * as argon2 from 'argon2';
 
 @Injectable()
 export class AuthService {
@@ -106,5 +109,47 @@ export class AuthService {
   async logout(userId:string){
     await this.usersService.clearRefreshToken(userId);
     return { message:"Logged out successfully" };
+  }
+
+  async forgotPassword(dto:ForgotPasswordDto):Promise<{message:string}>{
+    const user= await this.usersService.findByEmail(dto.email);
+
+    // Always return same message — prevents email enumeration
+    if (!user || !user.isActive) {
+        return { message: 'If that email exists, an OTP has been sent.' };
+    }
+
+    await this.otpService.sendOtpEmail(dto.email,user.fullName);
+    return {
+      message:"If that email exists, an OTP has been sent."
+    }
+  }
+
+  async resetPassword(dto:ResetPasswordDto):Promise<{message:string}>{
+    const user= await this.usersService.findByEmail(dto.email);
+
+    if(!user) throw new NotFoundException("User not found");
+
+    if(!user.isActive) throw new UnauthorizedException("Account is deactivated");
+
+    const isValidOtp=await this.otpService.verifyOtp(dto.email,dto.otp);
+    if(!isValidOtp){
+      throw new BadRequestException("Invalid or expired otp");
+    }
+
+    const hashedPassword=await argon2.hash(dto.newPassword,{
+      type:argon2.argon2id,
+      memoryCost:2**16,
+      timeCost:3,
+      parallelism:4
+    })
+
+    await this.usersService.updatePasswordById(user.id,hashedPassword);
+
+    await this.usersService.clearRefreshToken(user.id);
+
+    return {
+      message:"Password reset successfully. Please login with your new password."
+    }
   }
 }

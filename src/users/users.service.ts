@@ -353,4 +353,11 @@ export class UsersService {
       message:`Account ${user.isActive?"deactivated":"activated"} successfully.`
     }
   }
+
+  async updatePasswordById(userId:string, hashedPassword:string):Promise<void>{
+    await this.prisma.user.update({
+      where:{id:userId},
+      data:{password:hashedPassword}
+    })
+  }
 }
