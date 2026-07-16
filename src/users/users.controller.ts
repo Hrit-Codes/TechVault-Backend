@@ -16,7 +16,7 @@ import { GetUser } from "../common/decorators/get-user.decorator";
 export class UsersController{
     constructor(
         private readonly usersService:UsersService,
-        private readonly CloudinaryService:CloudinaryService,
+        private readonly cloudinaryService:CloudinaryService,
     ){}
 
     @Get('me')
