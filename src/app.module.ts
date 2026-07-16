@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './redis/redis.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { CommonModule } from './common/common.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { CommonModule } from './common/common.module';
     AuthModule,
     RedisModule,
     CommonModule,
-    CloudinaryModule
+    CloudinaryModule,
+    CategoriesModule
   ],
 })
 export class AppModule {}

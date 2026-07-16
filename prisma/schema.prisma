@@ -29,3 +29,17 @@ enum Role {
   USER
   ADMIN
 }
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique 
+  subtitle  String
+  image     String
+  slug      String   @unique
+  isActive  Boolean  @default(true)  
+  order     Int      @default(1)     
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")  
+
+  @@map("categories")
+}
