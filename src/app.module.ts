@@ -9,6 +9,7 @@ import { RedisModule } from './redis/redis.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { CommonModule } from './common/common.module';
 import { CategoriesModule } from './categories/categories.module';
+import { BrandsModule } from './brands/brands.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { CategoriesModule } from './categories/categories.module';
     RedisModule,
     CommonModule,
     CloudinaryModule,
-    CategoriesModule
+    CategoriesModule,
+    BrandsModule
   ],
 })
 export class AppModule {}

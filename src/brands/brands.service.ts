@@ -1,0 +1,151 @@
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { retry } from 'rxjs';
+import { CreateBrandDto } from './dto/create-brand.dto';
+import { equals } from 'class-validator';
+import { UpdateBrandDto } from './dto/update-brand.dto';
+
+@Injectable()
+export class BrandsService {
+    constructor(
+        private readonly prisma:PrismaService,
+        private readonly cloudinaryService:CloudinaryService
+    ){}
+
+    async getActiveBrands(){
+        const brands= await this.prisma.brand.findMany({
+            where:{isActive:true},
+            orderBy:{name:"asc"},
+            select:{id:true, name:true, logo:true,slug:true}
+        })
+
+        return {message:"Active brands fetched successfully", brands}
+    }
+
+    async getAllBrands(){
+        const brands= await this.prisma.brand.findMany({
+            orderBy:{name:"asc"}
+        })
+
+        return {message:"Brands fetched successfully",brands}
+    }
+
+    async getBrandBySlug(slug:string){
+        const brand=await this.prisma.brand.findUnique({
+            where:{slug}
+        })
+
+        if(!brand) throw new NotFoundException("Brand not found")
+
+        return {message:"Brand fetched successfully",brand}
+    }
+
+    async createBrand(dto:CreateBrandDto, file?:Express.Multer.File){
+        const existingName=await this.prisma.brand.findFirst({
+            where:{name:{equals:dto.name,mode:"insensitive"}}
+        })
+        if(existingName) throw new ConflictException("Brand name already exists");
+
+        const slug=dto.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+        let logoUrl:string|undefined;
+
+        if(file){
+            const result= await this.cloudinaryService.uploadImage(file,"techvault/brands");
+            const logoUrl=result.secure_url;
+        }
+
+        const brand= await this.prisma.brand.create({
+            data:{
+                name:dto.name,
+                slug,
+                logo:logoUrl,
+                isActive:dto.isActive?? true
+            }
+        })
+
+        return { message:"Brand created successfully", brand}
+    }
+
+    async updateBrand(id:string,dto:UpdateBrandDto, file?:Express.Multer.File){
+        const brand= await this.prisma.brand.findUnique({where:{id}})
+
+        if(!brand) throw new NotFoundException("Brand not found");
+
+        if(dto.name && dto.name !==brand.name){
+            const existingName=await this.prisma.brand.findFirst({
+                where:{
+                    name:{equals:dto.name, mode:"insensitive"},
+                    Not:{id},
+                },
+            });
+
+            if(existingName) throw new ConflictException("Brand name already exisits");
+        }
+
+        let slug=brand.slug;
+        if(dto.name){
+            slug=dto.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        }
+
+        let logoUrl=brand.logo;
+        if(file){
+            if(brand.logo){
+                const publicId= brand.logo.split('/').pop()?.split(".")[0];
+                if(publicId) await this.cloudinaryService.deleteImage(`techvault/brands/${publicId}`);
+            }
+            const result= await this.cloudinaryService.uploadImage(file,"techvault/brands");
+            logoUrl= result.secure_url;
+        }
+
+        const updatedBrand=await this.prisma.brand.update({
+            where:{id},
+            data:{
+                ...(dto.name && {name:dto.name}),
+                ...(dto.isActive && {isActive:dto.isActive}),
+                slug,
+                logo:logoUrl
+            }
+        })
+
+        return {message:"Brand updated successfully",updatedBrand};
+    }
+
+    async deleteBrand(id:string){
+        const brand= await this.prisma.brand.findUnique({
+            where:{id}
+        })
+
+        if(!brand) throw new NotFoundException("Brand not found");
+
+        if(brand.logo){
+            const logoUrl=brand.logo.split("/").pop()?.split(".")[0];
+            if(logoUrl) await this.cloudinaryService.deleteImage(`techvault/brands/${logoUrl}`);
+        }
+
+        await this.prisma.brand.delete({
+            where:{id},
+        })
+
+        return {message:"Brand deleted successfully",id:brand.id, name:brand.name}
+    }
+    
+    async toggleBrandStatus(id:string){
+        const brand=await this.prisma.brand.findUnique({
+            where:{id}
+        })
+
+        if(!brand) throw new NotFoundException("Brand not found");
+
+        const updatedBrand= await this.prisma.brand.update({
+            where:{id},
+            data:{isActive:brand.isActive}
+        });
+
+        return {
+            message:`Brand ${updatedBrand.isActive?"Activated":"Deactived"} successfully`,
+            data:updatedBrand
+        }
+    }
+}
