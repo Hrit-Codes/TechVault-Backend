@@ -11,6 +11,7 @@ import { CommonModule } from './common/common.module';
 import { CategoriesModule } from './categories/categories.module';
 import { BrandsModule } from './brands/brands.module';
 import { ProductsModule } from './products/products.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
@@ -25,7 +26,9 @@ import { ProductsModule } from './products/products.module';
     CloudinaryModule,
     CategoriesModule,
     BrandsModule,
-    ProductsModule
+    ProductsModule,
+    ReviewsModule
   ],
+  controllers: [],
 })
 export class AppModule {}
