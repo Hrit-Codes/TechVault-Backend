@@ -10,6 +10,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { CommonModule } from './common/common.module';
 import { CategoriesModule } from './categories/categories.module';
 import { BrandsModule } from './brands/brands.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -23,7 +24,8 @@ import { BrandsModule } from './brands/brands.module';
     CommonModule,
     CloudinaryModule,
     CategoriesModule,
-    BrandsModule
+    BrandsModule,
+    ProductsModule
   ],
 })
 export class AppModule {}
