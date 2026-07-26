@@ -77,7 +77,7 @@ export class BrandsService {
             const existingName=await this.prisma.brand.findFirst({
                 where:{
                     name:{equals:dto.name, mode:"insensitive"},
-                    Not:{id},
+                    NOT:{id},
                 },
             });
 
