@@ -18,6 +18,8 @@ model User {
   role            Role      @default(USER)
   isVerified      Boolean   @default(false) @map("is_verified")
   isActive        Boolean   @default(true) @map("is_active")
+  wishlist        WishlistItem[]
+
   lastLogin       DateTime? @map("last_login")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
@@ -76,6 +78,8 @@ model Product {
   isActive     Boolean  @default(true)  @map("is_active")  
   freeShipping Boolean  @default(false) @map("free_shipping")
 
+  wishlist     WishlistItem[]
+
   trustBadges  String[] @map("trust_badges")
 
   stock        Int      @default(0)
@@ -108,4 +112,17 @@ model Review {
   productId String   @map("product_id")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)  
   @@map("reviews")
+}
+
+model WishlistItem{
+  id       String   @id              @default(uuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields:[userId], references:[id], onDelete:Cascade)
+  product   Product  @relation(fields:[productId], references:[id], onDelete:Cascade)
+
+  @@unique([userId,productId])
+  @@map("wishlist_items")
 }
