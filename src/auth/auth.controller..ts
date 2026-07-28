@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express'; 
 import { AuthService } from './auth.service';
 import { RegisterRequestDto } from './dto/register-request.dto';
@@ -8,6 +8,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { GetUser } from '../common/decorators/get-user.decorator';
+import { GoogleGuard } from '../common/guards/google.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -97,4 +98,26 @@ export class AuthController {
     async resetPassword(@Body() dto: ResetPasswordDto) {
         return this.authService.resetPassword(dto);
     }
+
+    @Get("google")
+    @UseGuards(GoogleGuard)
+    async googleAuth(){
+        // Passport handles the redirect automatically
+    }
+
+    // Google redirects here after login
+    @Get("google/callback")
+    @UseGuards(GoogleGuard)
+    async googleCallback(
+        @GetUser() googleUser:any,
+        @Res({passthrough:true}) res:Response
+    ){
+        const result=await this.authService.googleLogin(googleUser);
+        this.setTokenCookies(res,result.accessToken, result.refreshToken);
+
+        // Redirect to frontend after successful login
+        res.redirect(`${process.env.FRONTEND_URL}/auth/google/success`);
+    }
+
+
 }

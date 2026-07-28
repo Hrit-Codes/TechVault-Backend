@@ -12,6 +12,7 @@ model User {
   avatar          String?
   email           String    @unique
   phoneNumber     String    @unique @map("phone_number")
+  googleId        String?   @unique @map("google_id")
   password        String
   refreshToken    String?   @map("refresh_token")
   defaultAddress  Json?     @map("default_address")

@@ -152,4 +152,30 @@ export class AuthService {
       message:"Password reset successfully. Please login with your new password."
     }
   }
+
+  async googleLogin(googleUser:{
+    email:string,
+    fullName:string,
+    avatar?:string,
+    googleId:string
+  }){
+    const user=await this.usersService.findOrCreateGoogleUser(googleUser);
+
+    if(!user.isActive) throw new UnauthorizedException("Accout is deactivated");
+
+    const tokens=await this.generateTokens(user.id,user.email,user.role);
+    await this.usersService.updateLastLogin(user.id);
+    
+    return {
+      message:"Google login successful",
+      user:{
+        id:user.id,
+        fullName:user.fullName,
+        email:user.email,
+        role:user.role,
+        avatar:user.avatar
+      },
+      ...tokens
+    }
+  }
 }
