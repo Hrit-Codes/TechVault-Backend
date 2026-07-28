@@ -12,6 +12,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { BrandsModule } from './brands/brands.module';
 import { ProductsModule } from './products/products.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { WishlistModule } from './wishlist/wishlist.module';
 
 @Module({
   imports: [
@@ -27,7 +28,8 @@ import { ReviewsModule } from './reviews/reviews.module';
     CategoriesModule,
     BrandsModule,
     ProductsModule,
-    ReviewsModule
+    ReviewsModule,
+    WishlistModule
   ],
   controllers: [],
 })
