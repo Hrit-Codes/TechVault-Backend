@@ -360,4 +360,57 @@ export class UsersService {
       data:{password:hashedPassword}
     })
   }
+
+  async findOrCreateGoogleUser(googleUser:{
+    email:string,
+    fullName:string,
+    avatar?:string,
+    googleId:string
+  }):Promise<any>{
+    let user=await this.prisma.user.findFirst({
+      where:{ 
+        googleId:googleUser.googleId
+      }
+    });
+
+    if(user){
+      //Update avatar if changed
+      if(googleUser.avatar && user.avatar!==googleUser.avatar){
+        user=await this.prisma.user.update({
+          where:{id:user.id},
+          data:{avatar:googleUser.avatar}
+        })
+      }
+      return user;
+    }
+
+    const existingEmail=await this.prisma.user.findUnique({
+      where:{email:googleUser.email}
+    })
+
+    if(existingEmail){
+      //Link Google account to the existing user
+      return this.prisma.user.update({
+        where:{id:existingEmail.id},
+        data:{
+          googleId:googleUser.googleId,
+          avatar:googleUser.avatar?? existingEmail.avatar,
+          isVerified:true
+        }
+      });
+    }
+
+    return this.prisma.user.create({
+      data:{
+        email:googleUser.email,
+        fullName:googleUser.fullName,
+        avatar:googleUser.avatar,
+        googleId:googleUser.googleId,
+        password:"", // No password for Google users
+        phoneNumber:"", // will need to be updated later
+        isVerified:true, // Google already verified email
+        role:"USER"
+      }
+    })
+  }
 }
