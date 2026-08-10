@@ -14,15 +14,13 @@ async function bootstrap() {
     whitelist:true,
     forbidNonWhitelisted:true,
     transform:true,
+    transformOptions:{
+      enableImplicitConversion:true
+    }
   }))
 
   app.setGlobalPrefix("/api/v1");
-  app.enableCors({
-    origin:process.env.FRONTEND_URL||"http://localhost:5173",
-    credentials:true,
-    method:["GET","POST","PATCH","PUT","DELETE","OPTIONS"],
-    allowedHeaders:["Content-Type","Authorizations"]
-  });
+  app.enableCors();
   app.useGlobalInterceptors(new TransformInterceptor())
   await app.listen(process.env.PORT ?? 3000);
 }

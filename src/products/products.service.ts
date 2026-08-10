@@ -141,23 +141,23 @@ export class ProductsService {
     //     }
     // }
 
+    // Admin
     async getProductById(id:string){
         const product=await this.prisma.product.findUnique({
             where:{id},
             include:{
+                category:true,
                 brand:true,
-                category:true
-            }
-        })
+            },
+        });
 
         if(!product) throw new NotFoundException("Product not found");
 
         return{
             message:"Product fetched successfully",
-            product
+            data:product
         }
     }
-
 
     async getAllProducts(query:QueryProductDto){
         const {
