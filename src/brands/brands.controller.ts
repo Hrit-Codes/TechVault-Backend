@@ -23,6 +23,14 @@ export class BrandsController {
         return this.brandsService.getActiveBrands();
     }
 
+    @Get("/all")
+    @UseGuards(JwtGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @HttpCode(HttpStatus.OK)
+    async getAllBrands(){
+        return this.brandsService.getAllBrands()
+    }
+
     @Get(':slug')
     @HttpCode(HttpStatus.OK)
     async getBrandBySlug(@Param("slug") slug:string){
@@ -31,13 +39,6 @@ export class BrandsController {
 
     // Admin
 
-    @Get("/all")
-    @UseGuards(JwtGuard, RolesGuard)
-    @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.OK)
-    async getAllBrands(){
-        return this.brandsService.getAllBrands()
-    }
 
     @Post()
     @UseGuards(JwtGuard, RolesGuard)
@@ -65,17 +66,17 @@ export class BrandsController {
     }
 
     @Delete(":id")
-    @UseGuards(RolesGuard,JwtGuard)
+    @UseGuards(JwtGuard,RolesGuard)
     @Roles(Role.ADMIN)
     @HttpCode(HttpStatus.OK)
     async deleteBrand(
         @Param('id') id:string
     ){
-        await this.brandsService.deleteBrand(id);
+        return this.brandsService.deleteBrand(id);
     }
 
     @Patch(":id/status")
-    @UseGuards(RolesGuard,JwtGuard)
+    @UseGuards(JwtGuard,RolesGuard)
     @Roles(Role.ADMIN)
     @HttpCode(HttpStatus.OK)
     async toggleStatus(

@@ -8,4 +8,8 @@ export class CreateBrandDto{
     @IsOptional()
     @IsBoolean()
     isActive?:boolean
+
+    @IsOptional()
+    @IsString()
+    logo?:string;
 }
