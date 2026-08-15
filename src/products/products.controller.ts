@@ -22,11 +22,21 @@ export class ProductsController {
         return this.productService.getProducts(query);
     }
 
-    // @Get('category/:categorySlug/brands')
-    // @HttpCode(HttpStatus.OK)
-    // async getBrandsByCategory(@Param("categorySlug") categorySlug:string){
-    //     return this.productService.get(categorySlug);
-    // }
+    @Get("/admin/all")
+    @UseGuards(JwtGuard,RolesGuard)
+    @Roles(Role.ADMIN)
+    @HttpCode(HttpStatus.OK)
+    async getAllProducts(@Query() query:QueryProductDto){
+        return this.productService.getAllProducts(query);
+    }
+
+    @Get("admin/:id")
+    @UseGuards(JwtGuard,RolesGuard)
+    @Roles(Role.ADMIN)
+    @HttpCode(HttpStatus.OK)
+    async getProductById(@Param("id") id:string){
+        return this.productService.getProductById(id);
+    }
 
     @Get(":slug")
     @HttpCode(HttpStatus.OK)
@@ -34,25 +44,8 @@ export class ProductsController {
         return this.productService.getProductBySlug(slug);
     }
 
-    // Admin
-    @Get("admin/:id")
-    @UseGuards(RolesGuard,JwtGuard)
-    @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.OK)
-    async getProductById(@Param("id") id:string){
-        return this.productService.getProductById(id);
-    }
-
-    @Get("/admin/all")
-    @UseGuards(RolesGuard,JwtGuard)
-    @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.OK)
-    async getAllProducts(@Query() query:QueryProductDto){
-        return this.productService.getAllProducts(query);
-    }
-
     @Delete(":id")
-    @UseGuards(RolesGuard,JwtGuard)
+    @UseGuards(JwtGuard,RolesGuard)
     @Roles(Role.ADMIN)
     @HttpCode(HttpStatus.OK)
     async deleteProduct(@Param("id") id:string){
