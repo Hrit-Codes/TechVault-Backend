@@ -182,10 +182,24 @@ export class ProductsService {
                 skip,
                 take:limit,
                 orderBy:{createdAt:"desc"},
-                include:{
-                    category:{select:{name:true, id:true}},
-                    brand:{select:{name:true, id:true}},
-                }
+                select:{
+                    id:true,
+                    name:true,
+                    slug:true,
+                    description:true,
+                    images:true,
+                    price:true,
+                    stock:true,
+                    salePrice:true,
+                    onSale:true,
+                    categoryId:true,
+                    brandId:true,
+                    category:{select:{id:true, name:true}},
+                    brand:{select:{id:true, name:true}},
+                    isActive:true,
+                    createdAt:true,
+                    updatedAt:true,
+                },
             }),
         ]);
 

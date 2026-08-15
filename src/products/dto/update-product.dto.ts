@@ -61,7 +61,7 @@ export class UpdateProductDto{
     @IsOptional()
     @Transform(({value})=>typeof value==="string"? JSON.parse(value):value)
     @IsObject()
-    specifications?:Record<string,string>[];
+    specifications?:Record<string,string>;
 
     @IsOptional()
     @Transform(({value})=>parseInt(value))
