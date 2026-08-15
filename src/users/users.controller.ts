@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Query, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CloudinaryService } from "../cloudinary/cloudinary.service";
 import { UsersService } from "./users.service";
@@ -10,6 +10,7 @@ import { JwtGuard } from "../common/guards/jwt.guard";
 import { Roles } from "../common/decorators/roles.decorator";
 import { Role } from "@prisma/client";
 import { GetUser } from "../common/decorators/get-user.decorator";
+import { QueryUsersDto } from "./dto/query-users.dto";
 
 @Controller('users')
 @UseGuards(JwtGuard, RolesGuard)
@@ -63,8 +64,20 @@ export class UsersController{
     @Get('admin/all')
     @Roles(Role.ADMIN)
     @HttpCode(HttpStatus.OK)
-    async getAllUsers(){
-        return this.usersService.getAllUsers();
+    async getAllUsers(@Query() query:QueryUsersDto){
+        return this.usersService.getAllUsers(
+            query.page,
+            query.limit,
+            query.search,
+            query.isActive
+        );
+    }
+
+    @Get("/admin/stats")
+    @Roles(Role.ADMIN)
+    @HttpCode(HttpStatus.OK)
+    async getUsersStats(){
+        return this.usersService.getUsersStats();
     }
 
     @Patch('admin/:id/status')

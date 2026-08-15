@@ -7,6 +7,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { IPagination } from '../types/pagination.types';
 
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -14,6 +15,18 @@ export class UsersService {
     private readonly cloudinaryService:CloudinaryService,
   ) {}
 
+  private getDateRanges() {
+    const now = new Date();
+
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = thisMonthStart;
+
+    return { thisMonthStart, thisMonthEnd, lastMonthStart, lastMonthEnd };
+  }
+  
   async findByEmailOrPhone(email: string, phoneNumber: string) {
     return this.prisma.user.findFirst({
       where: {
@@ -291,14 +304,23 @@ export class UsersService {
   async getAllUsers(
     page:number=1,
     limit:number=10,
-    isActive?:boolean,
+    search?:string,
+    isActive?:boolean
   ):Promise<{
     users:any[];
     pagination:IPagination;
   }>{
     const skip=(page-1)*limit;
     const where:any={};
-    
+
+    if(search){
+      where.OR=[
+        {fullName:{contains:search, mode:"insensitive"}},
+        {email:{contains:search,mode:"insensitive"}},
+        {phoneNumber:{contains:search, mode:"insensitive"}}
+      ]
+    }
+
     if(isActive!==undefined){
       where.isActive=isActive;
     }
@@ -412,5 +434,47 @@ export class UsersService {
         role:"USER"
       }
     })
+  }
+
+  async getUsersStats():Promise<{
+    totalCustomers:number,
+    verifiedCustomers:number,
+    newCustomersThisMonth:number,
+    newCustomersLastMonth:number,
+    totalAdmins:number
+  }>{
+
+    const {thisMonthStart, thisMonthEnd, lastMonthStart, lastMonthEnd}=this.getDateRanges();
+    const [totalCustomers,verifiedCustomers, newCustomersThisMonth, newCustomersLastMonth, totalAdmins]=await Promise.all([
+      this.prisma.user.count({
+        where:{role:"USER"}
+      }),
+      this.prisma.user.count({
+        where:{isVerified:true}
+      }),
+      this.prisma.user.count({
+        where:{
+          role:"USER",
+          createdAt:{gte:thisMonthStart, lt:thisMonthEnd}
+        },
+      }),
+      this.prisma.user.count({
+        where:{
+          role:"USER",
+          createdAt:{gte:lastMonthStart,lt:lastMonthEnd}
+        }
+      }),
+      this.prisma.user.count({
+        where:{role:"ADMIN"}
+      })
+    ])
+
+    return{
+      totalCustomers,
+      verifiedCustomers,
+      newCustomersThisMonth,
+      newCustomersLastMonth,
+      totalAdmins
+    }
   }
 }
