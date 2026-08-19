@@ -4,6 +4,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { QueryProductDto } from './dto/query-product.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { contains } from 'class-validator';
 
 @Injectable()
 export class ProductsService {
@@ -48,7 +49,8 @@ export class ProductsService {
         const orderBy:any=
             sortBy==="price_asc"?{price:"asc"}:
             sortBy==="price_desc"?{price:"desc"}:
-            sortBy==="rating"?{rating:"desc"}:
+            sortBy==="rating_asc"?{rating:"asc"}:
+            sortBy==="rating_desc"?{rating:"desc"}:
             {createdAt:"desc"};
 
         const [total,products]=await Promise.all([
@@ -161,11 +163,62 @@ export class ProductsService {
 
     async getAllProducts(query:QueryProductDto){
         const {
-            page=1, limit=12, search
+            page=1,
+            limit=10,
+            search,
+            categoryId,
+            brandId,
+            minPrice,
+            maxPrice,
+            isActive,
+            stockStatus,
+            onSale,
+            sortBy
         }=query;
 
         const skip=(page-1)*limit;
         const where:any={}
+
+        if(search){
+            where.OR=[
+                {name:{contains:search, mode:"insensitive"}},
+                {slug:{contains:search, mode:"insensitive"}},
+                {description:{contains:search, mode:"insensitive"}},
+            ]
+        }
+        if(categoryId!==undefined){
+            where.categoryId=categoryId;
+        }
+        if(brandId!==undefined){
+            where.brandId=brandId;
+        }
+        if(minPrice!==undefined || maxPrice!==undefined){
+            where.price={};
+            if(minPrice!==undefined) where.price.gte=minPrice;
+            if(maxPrice!==undefined) where.price.lt=maxPrice;
+
+        }
+        if(onSale!==undefined){
+            where.onSale=onSale;
+        }
+        if(isActive!==undefined){
+            where.isActive=isActive;
+        }
+        const LOW_STOCK_THRESHOLD=10;
+        if(stockStatus!==undefined){
+            if(stockStatus==="out-of-stock"){
+                where.stock=0
+            }else if(stockStatus==="low-stock"){
+                where.stock={gte:0, lt:LOW_STOCK_THRESHOLD}
+            }
+        }
+
+        const orderBy:any=
+            sortBy==="price_asc"?{price:"asc"}:
+            sortBy==="price_desc"?{price:"desc"}:
+            sortBy==="rating_asc"?{rating:"asc"}:
+            sortBy==="rating_desc"?{rating:"desc"}:
+            {createdAt:"desc"};
 
         if(search){
             where.OR=[
@@ -181,7 +234,7 @@ export class ProductsService {
                 where,
                 skip,
                 take:limit,
-                orderBy:{createdAt:"desc"},
+                orderBy,
                 select:{
                     id:true,
                     name:true,
