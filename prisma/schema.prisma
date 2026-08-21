@@ -46,6 +46,8 @@ model Category {
 
   products  Product[] 
 
+  offers    OfferCategory[]
+
   @@map("categories")
 }
 
@@ -59,6 +61,8 @@ model Brand {
   updatedAt DateTime @updatedAt      @map("updated_at")   
 
   products  Product[]
+
+  offers    OfferBrand[]
 
   @@map("brands")
 }
@@ -96,6 +100,8 @@ model Product {
   brand        Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   reviews      Review[]
 
+  offers       OfferProduct[]
+
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt      @map("updated_at")
 
@@ -126,4 +132,68 @@ model WishlistItem{
 
   @@unique([userId,productId])
   @@map("wishlist_items")
+}
+
+enum OfferType{
+  PERCENTAGE 
+  FIXED
+}
+
+model Offer{
+  id               String     @id @default(uuid())
+  title            String     
+  description      String?
+  bannerImage      String     @map("banner_image")
+  offerType        OfferType  @map("offer_type")
+  offerValue       Float      @map("offer_value")
+
+  startDate        DateTime   @map("start_date")
+  endDate          DateTime   @map("end_date")
+  isActive         Boolean    @default(true)        @map("is_active")
+
+  products         OfferProduct[]
+  brands           OfferBrand[]
+  categories       OfferCategory[]
+
+  createdAt        DateTime   @default(now())       @map("created_at")
+  updatedAt        DateTime   @updatedAt            @map("updated_at")
+
+  @@map("offers") 
+}
+
+model OfferProduct{
+  id               String     @id    @default(uuid())
+  offerId          String     @map("offer_id")
+  productId        String     @map("product_id")
+
+  offer            Offer      @relation(fields:[offerId], references:[id], onDelete:Cascade)
+  product          Product    @relation(fields:[productId],references:[id], onDelete:Cascade)
+
+
+  @@unique([offerId,productId])
+  @@map("offer_products")
+}
+
+model OfferBrand{
+  id               String     @id    @default(uuid())
+  offerId          String     @map("offer_id")
+  brandId          String     @map("brand_id")
+
+  offer            Offer      @relation(fields:[offerId], references:[id], onDelete:Cascade)
+  brand            Brand      @relation(fields:[brandId], references:[id],onDelete:Cascade)
+
+  @@unique([offerId, brandId])
+  @@map("offer_brands")   
+}
+
+model OfferCategory{
+  id               String      @id     @default(uuid())
+  offerId          String      @map("offer_id")
+  categoryId       String      @map("category_id")
+
+  offer            Offer       @relation(fields:[offerId], references:[id],onDelete:Cascade)
+  category         Category    @relation(fields:[categoryId],references:[id],onDelete:Cascade)
+
+  @@unique([offerId, categoryId])
+  @@map("offer_categories")
 }
