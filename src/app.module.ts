@@ -13,6 +13,7 @@ import { BrandsModule } from './brands/brands.module';
 import { ProductsModule } from './products/products.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { WishlistModule } from './wishlist/wishlist.module';
+import { OffersModule } from './offers/offers.module';
 
 @Module({
   imports: [
@@ -29,7 +30,8 @@ import { WishlistModule } from './wishlist/wishlist.module';
     BrandsModule,
     ProductsModule,
     ReviewsModule,
-    WishlistModule
+    WishlistModule,
+    OffersModule
   ],
   controllers: [],
 })
