@@ -197,3 +197,28 @@ model OfferCategory{
   @@unique([offerId, categoryId])
   @@map("offer_categories")
 }
+
+model CompanyInfo{
+  id               String    @id @default(uuid())
+  companyName      String    @map("company_name")
+  officeAddress    String    @map("office_address")
+  officeTelephone  String    @map("office_telephone")
+
+  emails           String[]
+  phones           String[]
+
+  description      String
+
+  logo             String
+
+  socialLinks      Json?      @map("social_links")
+
+  mapLatitude      Float      @map("map_latitude")
+  mapLongitude     Float      @map("map_longitude")
+
+  mapEmbedUrl      String?    @map("map_embeded_url")
+
+  createdAt        DateTime   @default(now())   @map("created_at")
+  updatedAt        DateTime   @updatedAt        @map("updated_at")
+}
+
