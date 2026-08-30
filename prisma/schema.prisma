@@ -267,3 +267,42 @@ model HeroSection {
   @@map("hero_sections")
 }
 
+model AboutUsStory{
+  id                  String    @id                @default(uuid())
+  eyebrow             String    
+  heading             String
+  paragraph           String
+  tagline             String    
+  image               String?
+  imagePublicId       String?   @map("image_public_id")
+  createdAt           DateTime  @default(now())     @map("created_at")
+  updatedAt           DateTime  @updatedAt          @map("updated_at")
+  
+  @@map("about_us_story")
+}
+
+model PromiseItem{
+  id                  String    @id @default(uuid())
+  title               String
+  description         String
+  icon                String    @default("CheckCircle")
+  order               Int       @default(0)
+  createdAt           DateTime  @default(now())     @map("created_at")
+  updatedAt           DateTime  @updatedAt          @map("updated_at")
+
+  @@index([order])
+  @@map("promise_items") 
+}
+
+model FaqItem{
+  id                  String    @id @default(uuid())
+  question            String    
+  answer              String
+  order               Int       @default(0)
+  createdAt           DateTime  @default(now())     @map("created_at")
+  updatedAt           DateTime  @updatedAt          @map("updated_at")
+
+  @@index([order])
+  @@map("faq_items")
+}
+
