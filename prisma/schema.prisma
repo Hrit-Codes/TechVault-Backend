@@ -155,6 +155,8 @@ model Offer{
   brands           OfferBrand[]
   categories       OfferCategory[]
 
+  heroSections     HeroSection[]
+
   createdAt        DateTime   @default(now())       @map("created_at")
   updatedAt        DateTime   @updatedAt            @map("updated_at")
 
@@ -220,5 +222,48 @@ model CompanyInfo{
 
   createdAt        DateTime   @default(now())   @map("created_at")
   updatedAt        DateTime   @updatedAt        @map("updated_at")
+
+  @@map("company_info")
+}
+
+enum TextAlignment {
+  LEFT
+  CENTER
+  RIGHT
+}
+
+model HeroSection {
+  id                  String        @id @default(uuid())
+
+  eyebrow             String?
+  headingLine1        String?        @map("heading_line_1")
+  headingLine2        String?        @map("heading_line_2")
+  description         String?
+
+  primaryButtonText   String?       @map("primary_button_text")
+  primaryButtonLink   String?       @map("primary_button_link")
+
+  secondaryButtonText String?       @map("secondary_button_text")
+  secondaryButtonLink String?       @map("secondary_button_link")
+
+  linkedOfferId       String?       @map("linked_offer_id")
+  linkedOffer         Offer?        @relation(fields: [linkedOfferId], references: [id], onDelete: SetNull)
+
+  mediaUrl            String        @map("media_url")
+  mediaPublicId       String        @map("media_public_id")
+
+  textAlignment       TextAlignment @default(LEFT) @map("text_alignment")
+
+  overlayColor        String?       @default("#000000") @map("overlay_color")
+  overlayOpacity      Int           @default(0) @map("overlay_opacity")
+
+  isActive            Boolean       @default(true) @map("is_active")
+  order               Int           @default(0)
+
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt      @map("updated_at")
+
+  @@index([order])
+  @@map("hero_sections")
 }
 
