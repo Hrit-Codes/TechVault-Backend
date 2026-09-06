@@ -77,4 +77,11 @@ export class OffersController {
     return this.offersService.toggleOfferActive(id)
   }
 
+  @Get("stats")
+  @UseGuards(JwtGuard,RolesGuard)
+  @Roles(Role.ADMIN)
+  async getOfferStats(){
+    return this.offersService.getOfferStats();
+  }
+
 }

@@ -276,5 +276,24 @@ export class OffersService {
             data:{id:offer.id, title:offer.title}
         }
     }
+
+    async getOfferStats(){
+        const now= new Date();
+
+        const [total, active, upcoming,expired]=await Promise.all([
+            this.prisma.offer.count(),
+            this.prisma.offer.count({where:{isActive:true}}),
+            this.prisma.offer.count({where:{startDate:{gt:now}}}),
+            this.prisma.offer.count({where:{endDate:{lt:now}}})
+        ])
+
+        return{
+            total,
+            active,
+            upcoming,
+            expired
+        }
+
+    }
 }
 
