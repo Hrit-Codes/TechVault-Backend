@@ -26,10 +26,6 @@ export class HeroSectionsService {
             }
         })
 
-        if(!sections || sections.length===0){
-            throw new NotFoundException("No active hero sections found");
-        }
-
         return{
             message:"Active hero sections fetched successfully",
             data:sections
@@ -43,10 +39,6 @@ export class HeroSectionsService {
                 linkedOffer:true
             }
         })
-
-        if(!sections||sections.length===0){
-            throw new NotFoundException("No hero sections found");
-        }
 
         return{
             message:"All hero sections fetched successfully",
