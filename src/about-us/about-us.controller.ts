@@ -80,7 +80,7 @@ export class AboutUsController {
     @Delete("admin/promises/:id")
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.OK)
+    @HttpCode(HttpStatus.NO_CONTENT)
     async deletePromiseItem(@Param("id") id: string) {
         return this.aboutUsService.deletePromiseItem(id);
     }

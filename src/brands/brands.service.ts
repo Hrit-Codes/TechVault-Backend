@@ -20,7 +20,10 @@ export class BrandsService {
             select:{id:true, name:true, logo:true,slug:true}
         })
 
-        return {message:"Active brands fetched successfully", brands}
+        return {
+            message:"Active brands fetched successfully",
+            data:brands
+        }
     }
 
     async getAllBrands(){

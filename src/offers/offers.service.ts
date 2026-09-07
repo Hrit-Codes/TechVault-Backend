@@ -181,13 +181,23 @@ export class OffersService {
             this.prisma.offer.findMany({
                 where,
                 skip,
+                select:{
+                    id:true,
+                    bannerImage:true,
+                    title:true,
+                    offerType:true,
+                    offerValue:true,
+                    startDate:true,
+                    endDate:true,
+                    isActive:true
+                },
                 take:limit,
                 orderBy:{title:"desc"},
-                include:this.offerInclude
             }),
         ]);
 
         return{
+            message:"Offers fetched succesfully",
             data:offers,
             pagination:{
                 total,
@@ -211,7 +221,8 @@ export class OffersService {
         }
 
         return {
-            offer
+            message:"Offer fetched successfully",
+            data:offer
         }
     }
 
@@ -288,10 +299,13 @@ export class OffersService {
         ])
 
         return{
-            total,
-            active,
-            upcoming,
-            expired
+            message:"Offer stats fetched succesfully",
+            data:{
+                total,
+                active,
+                upcoming,
+                expired
+            }
         }
 
     }

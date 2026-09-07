@@ -28,7 +28,7 @@ export class WishlistController {
     }
 
     @Delete(":productId")
-    @HttpCode(HttpStatus.OK)
+    @HttpCode(HttpStatus.NO_CONTENT)
     async removeFromWishlist(
         @GetUser("id") userId:string,
         @Param("productId") productId:string,
@@ -37,7 +37,7 @@ export class WishlistController {
     }
 
     @Delete()
-    @HttpCode(HttpStatus.OK)
+    @HttpCode(HttpStatus.NO_CONTENT)
     async clearWishlist(
         @GetUser("id") userId:string,
     ){
