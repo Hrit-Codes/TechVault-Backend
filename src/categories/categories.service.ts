@@ -24,7 +24,10 @@ export class CategoriesService {
             },
         });
 
-        return { message: 'Active categories fetched successfully', categories };
+        return { 
+            message: 'Active categories fetched successfully',
+            data:categories 
+        };
     }
 
     async getAllCategories() {

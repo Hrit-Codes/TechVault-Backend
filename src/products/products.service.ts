@@ -108,41 +108,6 @@ export class ProductsService {
         return {message:"Product fetched successfully",product};
     }
 
-    // async getProductReviews(productId:string,page=1,limit=10){
-    //     const product=await this.prisma.product.findUnique({
-    //         where:{id:productId}
-    //     })
-
-    //     if(!product) throw new NotFoundException("Product not found");
-
-    //     const skip=(page-1)*limit;
-
-    //     const [reviews,total]=await Promise.all([
-    //         this.prisma.review.findMany({
-    //             where:{productId},
-    //             orderBy:{createdAt:"asc"},
-    //             skip,
-    //             take:limit,
-    //         }),
-    //         this.prisma.review.count({
-    //             where:{productId}
-    //         }),
-    //     ]);
-
-    //     return {
-    //         message:"Reviews fetched successfully",
-    //         data:reviews,
-    //         pagination:{
-    //             total,
-    //             page,
-    //             limit,
-    //             totalPages:Math.ceil(total/limit),
-    //             hasNextPage:page<Math.ceil(total/limit),
-    //             hasPrevPage:page>1
-    //         }
-    //     }
-    // }
-
     async getProductById(id:string){
         const product=await this.prisma.product.findUnique({
             where:{id},
@@ -156,7 +121,7 @@ export class ProductsService {
 
         return{
             message:"Product fetched successfully",
-            product
+            data:product
         }
     }
 

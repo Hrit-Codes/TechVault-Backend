@@ -1,4 +1,18 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { QueryProductDto } from './dto/query-product.dto';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -12,76 +26,76 @@ import { UpdateProductDto } from './dto/update-product.dto';
 
 @Controller('products')
 export class ProductsController {
-    constructor(
-        private readonly productService:ProductsService
-    ){}
+  constructor(private readonly productService: ProductsService) {}
 
-    @Get()
-    @HttpCode(HttpStatus.OK)
-    async getProducts(@Query() query:QueryProductDto){
-        return this.productService.getProducts(query);
-    }
+  // ========== PUBLIC ==========
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  async getProducts(@Query() query: QueryProductDto) {
+    return this.productService.getProducts(query);
+  }
 
-    @Get("/admin/all")
-    @UseGuards(JwtGuard,RolesGuard)
-    @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.OK)
-    async getAllProducts(@Query() query:QueryProductDto){
-        return this.productService.getAllProducts(query);
-    }
+  @Get(':slug')
+  @HttpCode(HttpStatus.OK)
+  async getProductBySlug(@Param('slug') slug: string) {
+    return this.productService.getProductBySlug(slug);
+  }
 
-    @Get("admin/:id")
-    @UseGuards(JwtGuard,RolesGuard)
-    @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.OK)
-    async getProductById(@Param("id") id:string){
-        return this.productService.getProductById(id);
-    }
+  // ========== ADMIN ==========
+  @Get('admin/all')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getAllProducts(@Query() query: QueryProductDto) {
+    return this.productService.getAllProducts(query);
+  }
 
-    @Get(":slug")
-    @HttpCode(HttpStatus.OK)
-    async getProductBySlug(@Param("slug") slug:string){
-        return this.productService.getProductBySlug(slug);
-    }
+  @Get('admin/:id')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getProductById(@Param('id') id: string) {
+    return this.productService.getProductById(id);
+  }
 
-    @Delete(":id")
-    @UseGuards(JwtGuard,RolesGuard)
-    @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.OK)
-    async deleteProduct(@Param("id") id:string){
-        return this.productService.deleteProduct(id);
-    }
+  @Post()
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FilesInterceptor('images', 10, multerConfig))
+  async createProduct(
+    @Body() dto: CreateProductDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.productService.createProduct(dto, files);
+  }
 
-    @Patch(":id/status")
-    @UseGuards(RolesGuard,JwtGuard)
-    @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.OK)
-    async toggleProductStatus(@Param("id") id:string){
-        return this.productService.toggleProductStatus(id);
-    }
+  @Patch(':id')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FilesInterceptor('images', 10, multerConfig))
+  async updateProduct(
+    @Param('id') id: string,
+    @Body() dto: UpdateProductDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.productService.updateProduct(id, dto, files);
+  }
 
-    @Post()
-    @UseGuards(JwtGuard,RolesGuard)
-    @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.CREATED)
-    @UseInterceptors(FilesInterceptor("images",10,multerConfig))
-    async createProduct(
-        @Body() dto:CreateProductDto,
-        @UploadedFiles() files:Express.Multer.File[]
-    ){
-        return this.productService.createProduct(dto,files)
-    }
+  @Patch(':id/status')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async toggleProductStatus(@Param('id') id: string) {
+    return this.productService.toggleProductStatus(id);
+  }
 
-    @Patch(":id")
-    @UseGuards(JwtGuard,RolesGuard)
-    @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.OK)
-    @UseInterceptors(FilesInterceptor("images",10,multerConfig))
-    async updateProduct(
-        @Param("id") id:string,
-        @Body() dto:UpdateProductDto,
-        @UploadedFiles() files:Express.Multer.File[]
-    ){
-        return this.productService.updateProduct(id,dto,files)
-    }
+  @Delete(':id')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteProduct(@Param('id') id: string) {
+    await this.productService.deleteProduct(id);
+  }
 }
