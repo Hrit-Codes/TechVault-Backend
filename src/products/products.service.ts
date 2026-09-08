@@ -8,13 +8,43 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { QueryProductDto } from './dto/query-product.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { OffersService } from '../offers/offers.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly offersService:OffersService
   ) {}
+
+  private attachOfferInfo<T extends{
+    id:string,
+    brandId:string,
+    categoryId:string,
+    price:number,
+    onSale:boolean,
+    salePrice:number|null
+  },>(
+    product:T,
+    activeOffers:Awaited<ReturnType<OffersService[`getActiveOffersForResolution`]>>,
+  ){
+    const resolved=this.offersService.resolveBestOfferForProduct(activeOffers, product);
+
+    if(resolved){
+      return{
+        ...product,
+        onSale:true,
+        salePrice:resolved.discountedPrice,
+        appliedOffer:{ id:resolved.offer.id, title:resolved.offer.title}
+      }
+    }
+
+    return{
+      ...product,
+      appliedOffer:null,
+    }
+  }
 
   private generateSlug(name: string): string {
     return name
@@ -75,7 +105,7 @@ export class ProductsService {
               ? { rating: 'desc' }
               : { createdAt: 'desc' };
 
-    const [total, products] = await Promise.all([
+    const [total, products,activeOffers] = await Promise.all([
       this.prisma.product.count({ where }),
       this.prisma.product.findMany({
         where,
@@ -100,11 +130,14 @@ export class ProductsService {
           brandId: true,
         },
       }),
+      this.offersService.getActiveOffersForResolution(),
     ]);
 
+    const productsWithOffers=products.map((p)=>this.attachOfferInfo(p,activeOffers));
+    
     return {
       message: 'Products fetched successfully',
-      data: products,
+      data: productsWithOffers,
       pagination: {
         total,
         page,
@@ -117,18 +150,23 @@ export class ProductsService {
   }
 
   async getProductBySlug(slug: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { slug },
-      include: {
-        category: { select: { id: true, name: true, slug: true } },
-        brand: { select: { id: true, name: true, slug: true, logo: true } },
-      },
-    });
+    const [product,activeOffers] = await Promise.all([
+      this.prisma.product.findUnique({
+        where: { slug },
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+          brand: { select: { id: true, name: true, slug: true, logo: true } },
+        },
+      }),
+      this.offersService.getActiveOffersForResolution()
+    ])
     if (!product) throw new NotFoundException('Product not found');
+
+    const productWithOffer=this.attachOfferInfo(product,activeOffers);
 
     return {
       message: 'Product fetched successfully',
-      data: product,
+      data: productWithOffer,
     };
   }
 
@@ -195,7 +233,7 @@ export class ProductsService {
               ? { rating: 'desc' }
               : { createdAt: 'desc' };
 
-    const [total, products] = await Promise.all([
+    const [total, products,activeOffers] = await Promise.all([
       this.prisma.product.count({ where }),
       this.prisma.product.findMany({
         where,
@@ -221,11 +259,14 @@ export class ProductsService {
           updatedAt: true,
         },
       }),
+      this.offersService.getActiveOffersForResolution(),
     ]);
+
+    const productsWithOffers=products.map((p)=>this.attachOfferInfo(p,activeOffers));
 
     return {
       message: 'All products fetched successfully',
-      data: products,
+      data: productsWithOffers,
       pagination: {
         total,
         page,
@@ -238,18 +279,23 @@ export class ProductsService {
   }
 
   async getProductById(id: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-      include: {
-        brand: true,
-        category: true,
-      },
-    });
+    const [product,activeOffers] = await Promise.all([
+      this.prisma.product.findUnique({
+        where: { id },
+        include: {
+          brand: true,
+          category: true,
+        },
+      }),
+      this.offersService.getActiveOffersForResolution()
+    ])
     if (!product) throw new NotFoundException('Product not found');
+
+    const productWithOffer=this.attachOfferInfo(product,activeOffers);
 
     return {
       message: 'Product fetched successfully',
-      data: product,
+      data: productWithOffer,
     };
   }
 
