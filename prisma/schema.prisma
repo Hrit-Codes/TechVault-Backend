@@ -79,7 +79,6 @@ model Product {
   images       String[]
 
   badge        String?
-  isNew        Boolean  @default(false) @map("is_new")
   isActive     Boolean  @default(true)  @map("is_active")  
   freeShipping Boolean  @default(false) @map("free_shipping")
 
@@ -102,10 +101,32 @@ model Product {
 
   offers       OfferProduct[]
 
+  variants     ProductVariant[]
+
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt      @map("updated_at")
 
   @@map("products")
+}
+
+model ProductVariant{
+  id            String   @id @default(uuid())
+  productId     String   @map("product_id")
+  product       Product  @relation(fields:[productId],references:[id],onDelete:Cascade)
+  color         String?
+  variant       String?
+
+
+  priceOverride Float?   @map("price_override")
+  stockOverride Int?     @map("stock_override")
+
+  isActive      Boolean  @default(true)   @map("is_active")
+
+  createdAt     DateTime @default(now())  @map("created_at")
+  updatedAt     DateTime @updatedAt       @map("updated_at")
+
+  @@unique([productId,color,variant])
+  @@map("product_variants")
 }
 
 model Review {

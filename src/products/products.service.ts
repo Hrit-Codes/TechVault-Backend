@@ -9,14 +9,33 @@ import { QueryProductDto } from './dto/query-product.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { OffersService } from '../offers/offers.service';
+import { CreateProductVariantDto } from './dto/create-product-variant.dto';
+import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
+import { CreateVariantsBulkDto } from './dto/create-variants-bulk.dto';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
-    private readonly offersService:OffersService
+    private readonly offersService: OffersService,
   ) {}
+
+  private readonly NEW_PRODUCT_WINDOW_DAYS = 30;
+
+  private computeIsNew(createdAt: Date): boolean {
+    const ageInMs = Date.now() - createdAt.getTime();
+    const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
+    return ageInDays <= this.NEW_PRODUCT_WINDOW_DAYS;
+  }
+
+  // Only requires createdAt — isNew (if present on T) is always overwritten anyway,
+  // so it should never be part of the input constraint.
+  private withComputedIsNew<T extends { createdAt: Date }>(
+    product: T,
+  ): T & { isNew: boolean } {
+    return { ...product, isNew: this.computeIsNew(product.createdAt) };
+  }
 
   private attachOfferInfo<T extends{
     id:string,
@@ -91,7 +110,13 @@ export class ProductsService {
     if (brandSlug) where.brand = { slug: brandSlug };
     if (minPrice !== undefined) where.price = { ...where.price, gte: minPrice };
     if (maxPrice !== undefined) where.price = { ...where.price, lte: maxPrice };
-    if (isNew !== undefined) where.isNew = isNew;
+
+    // isNew is derived from createdAt, not stored — translate the filter into a date range
+    if (isNew !== undefined) {
+      const cutoff = new Date(Date.now() - this.NEW_PRODUCT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+      where.createdAt = isNew ? { gte: cutoff } : { lt: cutoff };
+    }
+
     if (onSale !== undefined) where.onSale = onSale;
 
     const orderBy: any =
@@ -122,19 +147,21 @@ export class ProductsService {
           onSale: true,
           images: true,
           badge: true,
-          isNew: true,
           freeShipping: true,
           rating: true,
           reviewCount: true,
           categoryId: true,
           brandId: true,
+          createdAt: true,
         },
       }),
       this.offersService.getActiveOffersForResolution(),
     ]);
 
-    const productsWithOffers=products.map((p)=>this.attachOfferInfo(p,activeOffers));
-    
+    const productsWithOffers = products
+      .map((p) => this.withComputedIsNew(p))
+      .map((p) => this.attachOfferInfo(p, activeOffers));
+
     return {
       message: 'Products fetched successfully',
       data: productsWithOffers,
@@ -156,13 +183,14 @@ export class ProductsService {
         include: {
           category: { select: { id: true, name: true, slug: true } },
           brand: { select: { id: true, name: true, slug: true, logo: true } },
+          variants:{where:{isActive:true}}
         },
       }),
       this.offersService.getActiveOffersForResolution()
     ])
     if (!product) throw new NotFoundException('Product not found');
 
-    const productWithOffer=this.attachOfferInfo(product,activeOffers);
+    const productWithOffer = this.attachOfferInfo(this.withComputedIsNew(product), activeOffers);
 
     return {
       message: 'Product fetched successfully',
@@ -262,7 +290,9 @@ export class ProductsService {
       this.offersService.getActiveOffersForResolution(),
     ]);
 
-    const productsWithOffers=products.map((p)=>this.attachOfferInfo(p,activeOffers));
+    const productsWithOffers = products
+      .map((p) => this.withComputedIsNew(p))
+      .map((p) => this.attachOfferInfo(p, activeOffers));
 
     return {
       message: 'All products fetched successfully',
@@ -285,13 +315,14 @@ export class ProductsService {
         include: {
           brand: true,
           category: true,
+          variants:true
         },
       }),
       this.offersService.getActiveOffersForResolution()
     ])
     if (!product) throw new NotFoundException('Product not found');
 
-    const productWithOffer=this.attachOfferInfo(product,activeOffers);
+    const productWithOffer = this.attachOfferInfo(this.withComputedIsNew(product), activeOffers);
 
     return {
       message: 'Product fetched successfully',
@@ -340,7 +371,6 @@ export class ProductsService {
         onSale: dto.onSale ?? false,
         images,
         badge: dto.badge,
-        isNew: dto.isNew,
         isActive: dto.isActive,
         freeShipping: dto.freeShipping ?? false,
         trustBadges: dto.trustBadges ?? [],
@@ -358,7 +388,7 @@ export class ProductsService {
 
     return {
         message: 'Product created successfully',
-        data: product,
+        data: this.withComputedIsNew(product),
     };
     }
 
@@ -423,7 +453,6 @@ export class ProductsService {
         ...(dto.salePrice !== undefined && { salePrice: dto.salePrice }),
         ...(dto.onSale !== undefined && { onSale: dto.onSale }),
         ...(dto.badge !== undefined && { badge: dto.badge }),
-        ...(dto.isNew !== undefined && { isNew: dto.isNew }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.freeShipping !== undefined && { freeShipping: dto.freeShipping }),
         ...(dto.trustBadges !== undefined && { trustBadges: dto.trustBadges }),
@@ -443,7 +472,7 @@ export class ProductsService {
 
     return {
       message: 'Product updated successfully',
-      data: updatedProduct,
+      data: this.withComputedIsNew(updatedProduct),
     };
   }
 
@@ -478,5 +507,149 @@ export class ProductsService {
       message: `Product ${updatedProduct.isActive ? 'activated' : 'deactivated'} successfully`,
       data: updatedProduct,
     };
+  }
+
+  async getVariants(productId:string){
+    const product=await this.prisma.product.findUnique({where:{id:productId}});
+
+    if(!product) throw new NotFoundException("Product not found");
+
+    const variants=await this.prisma.productVariant.findMany({
+      where:{productId},
+      orderBy:[{color:"asc"},{variant:"asc"}]
+    });
+
+    return{
+      message:"Variants fetched successfully",
+      data:variants
+    }
+  }
+
+  async createVariant(productId:string,dto:CreateProductVariantDto){
+    const product=await this.prisma.product.findUnique({where:{id:productId}});
+
+    if(!product) throw new NotFoundException("Product not found");
+
+    if(!dto.color && !dto.variant){
+      throw new BadRequestException("A variant needs at least a color or a variant value");
+    }
+
+    const existing=await this.prisma.productVariant.findFirst({
+      where:{
+        productId,
+        color:dto.color??null,
+        variant:dto.variant??null
+      }
+    });
+
+    if(existing){
+      throw new BadRequestException("This color/variant combination already exists for this product")
+    }
+
+    const variant=await this.prisma.productVariant.create({
+      data:{
+        productId,
+        color:dto.color,
+        variant:dto.variant,
+        priceOverride:dto.priceOverride,
+        stockOverride:dto.stockOverride,
+        isActive:dto.isActive??true
+      }
+    })
+
+    return{
+      message:"Variant created successfully",
+      data:variant
+    }
+  }
+
+  async updateVariant(productId:string, variantId:string, dto:UpdateProductVariantDto){
+    const variant=await this.prisma.productVariant.findUnique({where:{id:variantId}})
+
+    if(!variant || variant.productId!==productId){
+      throw new NotFoundException("Variant not found");
+    }
+
+    const updated=await this.prisma.productVariant.update({
+      where:{id:variantId},
+      data:{
+        ...(dto.color!==undefined && {color:dto.color}),
+        ...(dto.variant!==undefined && {variant:dto.variant}),
+        ...(dto.priceOverride!==undefined && {priceOverride:dto.priceOverride}),
+        ...(dto.stockOverride!==undefined && {stockOverride:dto.stockOverride}),
+        ...(dto.isActive!==undefined && {isActive:dto.isActive}),
+      }
+    })
+
+    return{
+      message:"Variant updated successfully",
+      data:updated
+    }
+  }
+
+  async deleteVariant(productId:string, variantId:string){
+    const variant=await this.prisma.productVariant.findUnique({where:{id:variantId}});
+
+    if(!variant || variant.productId!==productId){
+      throw new NotFoundException("Variant not found");
+    }
+
+    await this.prisma.productVariant.delete({where:{id:variantId}});
+  }
+
+  async createVariantsBulk(productId:string, dto:CreateVariantsBulkDto){
+    const product=await this.prisma.product.findUnique({where:{id:productId}});
+
+    if(!product) throw new NotFoundException("Product not found");
+
+    const colors=dto.colors?.length? dto.colors:[null];
+    const variants=dto.variants?.length? dto.variants:[null];
+
+    if(colors.length===1 && colors[0]===null && variants.length===1 && variants[0]===null){
+      throw new BadRequestException("Provide at least one color or one variant value");
+    }
+
+    const combinations=colors.flatMap((color)=>
+      variants.map((variant)=>({color,variant}))
+    );
+
+    const existing=await this.prisma.productVariant.findMany({
+      where:{productId},
+      select:{color:true, variant:true}
+    });
+
+    const existingKeys=new Set(existing.map((e)=>`${e.color??""}::${e.variant??""}`));
+
+    const toCreate=combinations.filter(
+      (c)=>!existingKeys.has(`${c.color??""}::${c.variant??""}`)
+    )
+
+    if(toCreate.length===0){
+      throw new BadRequestException("All requested combinations already exist for this product");
+    }
+
+    const rows=toCreate.map((c)=>{
+      const priceOverride=c.variant? dto.priceMap?.[c.variant]:undefined;
+
+      const stockKey=c.color? `${c.color}::${c.variant??""}`:(c.variant??"");
+      const stockOverride=dto.stockMap?.[stockKey]??dto.defaultStock??0;
+
+      return{
+        productId,
+        color:c.color,
+        variant:c.variant,
+        priceOverride,
+        stockOverride
+      }
+    });
+
+  const created = await this.prisma.$transaction(
+    rows.map((row) => this.prisma.productVariant.create({ data: row })),
+  );
+
+    return{
+      message:`${created.length} variant(s) created successfully`,
+      data:created
+    }
   }
 }
