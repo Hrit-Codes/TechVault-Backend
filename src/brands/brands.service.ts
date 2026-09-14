@@ -3,21 +3,44 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
+import { RedisService } from '../redis/redis.service';
+
+const BRANDS_CACHE_KEY="brands:all";
+const BRANDS_ACTIVE_CACHE_KEY="brands:active";
+const BRANDS_CACHE_TTL=30*60;
 
 @Injectable()
 export class BrandsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly redisService:RedisService
   ) {}
+
+  private async clearBrandsCache(slug?: string) {
+    const keysToDelete = [BRANDS_CACHE_KEY, BRANDS_ACTIVE_CACHE_KEY];
+    if (slug) {
+      keysToDelete.push(`brands:slug:${slug}`);
+    }
+    await this.redisService.del(...keysToDelete);
+  }
 
   // ─── PUBLIC ────────────────────────────────────────────────
   async getActiveBrands() {
+    const cached=await this.redisService.get<any>(BRANDS_ACTIVE_CACHE_KEY);
+    if(cached){
+      return{
+        message:"Active brands fetched successfully",
+        data:cached
+      }
+    }
     const brands = await this.prisma.brand.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
       select: { id: true, name: true, logo: true, slug: true },
     });
+
+    await this.redisService.set(BRANDS_ACTIVE_CACHE_KEY,brands,BRANDS_CACHE_TTL);
 
     return {
       message: 'Active brands fetched successfully',
@@ -26,11 +49,20 @@ export class BrandsService {
   }
 
   async getBrandBySlug(slug: string) {
+    const cacheKey=`brands:slug:${slug}`;
+    const cached=await this.redisService.get<any>(cacheKey);
+    if(cached){
+      return{
+        message:"Brand fetched successfully",
+        data:cached
+      }
+    }
     const brand = await this.prisma.brand.findUnique({
       where: { slug },
     });
     if (!brand) throw new NotFoundException('Brand not found');
 
+    await this.redisService.set(cacheKey, brand, BRANDS_CACHE_TTL);
     return {
       message: 'Brand fetched successfully',
       data: brand,
@@ -39,9 +71,18 @@ export class BrandsService {
 
   // ─── ADMIN ────────────────────────────────────────────────
   async getAllBrands() {
+    const cached=await this.redisService.get(BRANDS_CACHE_KEY);
+    if(cached){
+      return{
+        message:"Brands fetched successfully",
+        data:cached
+      }
+    }
     const brands = await this.prisma.brand.findMany({
       orderBy: { name: 'asc' },
     });
+
+    await this.redisService.set(BRANDS_CACHE_KEY, brands, BRANDS_CACHE_TTL);
 
     return {
       message: 'Brands fetched successfully',
@@ -80,6 +121,8 @@ export class BrandsService {
         isActive: dto.isActive ?? true,
       },
     });
+
+    await this.clearBrandsCache();
 
     return {
       message: 'Brand created successfully',
@@ -132,6 +175,8 @@ export class BrandsService {
       },
     });
 
+    await this.clearBrandsCache();
+
     return {
       message: 'Brand updated successfully',
       data: updatedBrand,
@@ -151,6 +196,8 @@ export class BrandsService {
       }
     }
 
+    await this.clearBrandsCache();
+
     await this.prisma.brand.delete({ where: { id } });
   }
 
@@ -164,6 +211,8 @@ export class BrandsService {
       where: { id },
       data: { isActive: !brand.isActive },
     });
+
+    await this.clearBrandsCache(brand.slug);
 
     return {
       message: `Brand ${updatedBrand.isActive ? 'Activated' : 'Deactivated'} successfully`,
