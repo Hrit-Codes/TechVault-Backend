@@ -1,152 +1,170 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { RedisService } from '../redis/redis.service'; // 1. Import RedisService
 import { CreateCompanyInfoDto } from './dto/create-companyInfo.dto';
 import { UpdateCompanyInfoDto } from './dto/update-companyInfo.dto';
-import { log } from 'console';
+
+const COMPANY_INFO_CACHE_KEY = 'companyInfo:all';
+const COMPANY_INFO_CACHE_TTL = 30 * 60; 
 
 @Injectable()
 export class CompanyInfoService {
     constructor(
-        private readonly prisma:PrismaService,
-        private readonly cloudinaryService:CloudinaryService
-    ){}
+        private readonly prisma: PrismaService,
+        private readonly cloudinaryService: CloudinaryService,
+        private readonly redisService: RedisService, 
+    ) {}
 
-    private extractPublicId(url:string, folder:string):string|null{
-        const filename=url.split("/").pop()?.split(".")[0];
-        return filename? `${folder}/${filename}`:null;
+    private extractPublicId(url: string, folder: string): string | null {
+        const filename = url.split("/").pop()?.split(".")[0];
+        return filename ? `${folder}/${filename}` : null;
     }
 
-    async getCompanyInfo(){
-        const info=await this.prisma.companyInfo.findFirst();
+    async getCompanyInfo() {
+        const cached = await this.redisService.get<any>(COMPANY_INFO_CACHE_KEY);
+        if (cached) {
+            return {
+                message: "Company info fetched successfully",
+                info: cached,
+            };
+        }
 
-        if(!info){
+        const info = await this.prisma.companyInfo.findFirst();
+
+        if (!info) {
             throw new NotFoundException("Company information has not been set up yet");
         }
 
+        await this.redisService.set(COMPANY_INFO_CACHE_KEY, info, COMPANY_INFO_CACHE_TTL);
+
         return {
-            message:"Company info fetched successfully",
-            info
-        }
+            message: "Company info fetched successfully",
+            info,
+        };
     }
 
-    async createCompanyInfo(dto:CreateCompanyInfoDto, logoFile?:Express.Multer.File){
-        const existing=await this.prisma.companyInfo.findFirst();
+    async createCompanyInfo(dto: CreateCompanyInfoDto, logoFile?: Express.Multer.File) {
+        const existing = await this.prisma.companyInfo.findFirst();
 
-        if(existing){
+        if (existing) {
             throw new BadRequestException("Company information already exists. Please use update");
         }
 
-        if(!logoFile){
+        if (!logoFile) {
             throw new BadRequestException("A logo is required when setting up company info");
         }
 
-        if(!dto.emails?.length){
+        if (!dto.emails?.length) {
             throw new BadRequestException("At least one email address is required");
         }
 
-        if(!dto.phones?.length){
+        if (!dto.phones?.length) {
             throw new BadRequestException("At least one phone number is required");
         }
 
-        const uploaded=await this.cloudinaryService.uploadImage(logoFile,"techvault/company");
+        const uploaded = await this.cloudinaryService.uploadImage(logoFile, "techvault/company");
 
-        const info=await this.prisma.companyInfo.create({
-            data:{
-                companyName:dto.companyName,
-                officeAddress:dto.officeAddress,
-                officeTelephone:dto.officeTelephone,
-                emails:dto.emails,
-                phones:dto.phones,
-                description:dto.description,
-                logo:uploaded.secure_url,
-                socialLinks:dto.socialLinks,
-                mapLatitude:dto.mapLatitude,
-                mapLongitude:dto.mapLongitude,
-                mapEmbedUrl:dto.mapEmbedUrl,
+        const info = await this.prisma.companyInfo.create({
+            data: {
+                companyName: dto.companyName,
+                officeAddress: dto.officeAddress,
+                officeTelephone: dto.officeTelephone,
+                emails: dto.emails,
+                phones: dto.phones,
+                description: dto.description,
+                logo: uploaded.secure_url,
+                socialLinks: dto.socialLinks,
+                mapLatitude: dto.mapLatitude,
+                mapLongitude: dto.mapLongitude,
+                mapEmbedUrl: dto.mapEmbedUrl,
             }
-        })
+        });
 
-        return{
-            message:"Company Info created successfully",
-            info
-        }
+        await this.redisService.del(COMPANY_INFO_CACHE_KEY);
+
+        return {
+            message: "Company Info created successfully",
+            info,
+        };
     }
 
-    async updateCompanyInfo(dto:UpdateCompanyInfoDto, logoFile?:Express.Multer.File){
-        const existing= await this.prisma.companyInfo.findFirst();
+    async updateCompanyInfo(dto: UpdateCompanyInfoDto, logoFile?: Express.Multer.File) {
+        const existing = await this.prisma.companyInfo.findFirst();
         
-        if(!existing){
+        if (!existing) {
             throw new BadRequestException("Company information has not been set up yet. Please create it first");
         }
 
-        if(dto.emails!==undefined && dto.emails.length===0){
+        if (dto.emails !== undefined && dto.emails.length === 0) {
             throw new BadRequestException("At least one email address is required");
         }
 
-        if(dto.phones?.at!==undefined && dto.phones.length===0){
+        if (dto.phones !== undefined && dto.phones.length === 0) {
             throw new BadRequestException("At least one phone number is required");
         }
 
-        let logoUrl=existing.logo;
-        if(logoFile){
-            if(existing.logo){
-                const publicId=this.extractPublicId(existing.logo,"techvault/company");
-                if(publicId){
+        let logoUrl = existing.logo;
+        if (logoFile) {
+            if (existing.logo) {
+                const publicId = this.extractPublicId(existing.logo, "techvault/company");
+                if (publicId) {
                     await this.cloudinaryService.deleteImage(publicId);
                 }
             }
-            const uploaded=await this.cloudinaryService.uploadImage(logoFile,"techvault/company");
-            logoUrl=uploaded.secure_url;
+            const uploaded = await this.cloudinaryService.uploadImage(logoFile, "techvault/company");
+            logoUrl = uploaded.secure_url;
         }
 
+        const updateData: any = {
+            ...(dto.companyName !== undefined && { companyName: dto.companyName }),
+            ...(dto.officeAddress !== undefined && { officeAddress: dto.officeAddress }),
+            ...(dto.officeTelephone !== undefined && { officeTelephone: dto.officeTelephone }),
+            ...(dto.emails !== undefined && { emails: dto.emails }),
+            ...(dto.phones !== undefined && { phones: dto.phones }),
+            ...(dto.description !== undefined && { description: dto.description }),
+            ...(dto.socialLinks !== undefined && { socialLinks: dto.socialLinks }),
+            ...(dto.mapLatitude !== undefined && { mapLatitude: dto.mapLatitude }),
+            ...(dto.mapLongitude !== undefined && { mapLongitude: dto.mapLongitude }),
+            ...(dto.mapEmbedUrl !== undefined && { mapEmbedUrl: dto.mapEmbedUrl }),
+            logo: logoUrl,
+        };
 
-        const updateData:any={
-            ...(dto.companyName!==undefined && {companyName:dto.companyName}),
-            ...(dto.officeAddress!==undefined && {officeAddress:dto.officeAddress}),
-            ...(dto.officeTelephone!==undefined && {officeTelephone:dto.officeTelephone}),
-            ...(dto.emails!==undefined && {emails:dto.emails}),
-            ...(dto.phones!==undefined && {phones:dto.phones}),
-            ...(dto.description!==undefined && {description:dto.description}),
-            ...(dto.socialLinks!==undefined && {socialLinks:dto.socialLinks}),
-            ...(dto.mapLatitude!==undefined && {mapLatitude:dto.mapLatitude}),
-            ...(dto.mapLongitude!==undefined && {mapLongitude:dto.mapLongitude}),
-            ...(dto.mapEmbedUrl!==undefined && {mapEmbedUrl:dto.mapEmbedUrl}),
-            logo:logoUrl
-        }
+        const updated = await this.prisma.companyInfo.update({
+            where: { id: existing.id },
+            data: updateData,
+        });
 
-        const updated=await this.prisma.companyInfo.update({
-            where:{id:existing.id},
-            data:updateData
-        })
+        await this.redisService.del(COMPANY_INFO_CACHE_KEY);
 
-        return{
-            message:"Company info updated successfully",
-            info:updated
-        }
+        return {
+            message: "Company info updated successfully",
+            info: updated,
+        };
     }
 
-    async deleteCompanyInfo(){
-        const existing=await this.prisma.companyInfo.findFirst();
+    async deleteCompanyInfo() {
+        const existing = await this.prisma.companyInfo.findFirst();
 
-        if(!existing){
+        if (!existing) {
             throw new BadRequestException("No company info to delete");
         }
 
-        if(existing.logo){
-            const publicId=this.extractPublicId(existing.logo,"techvault/company");
-            if(publicId){
+        if (existing.logo) {
+            const publicId = this.extractPublicId(existing.logo, "techvault/company");
+            if (publicId) {
                 await this.cloudinaryService.deleteImage(publicId);
             }
         }
 
         await this.prisma.companyInfo.delete({
-            where:{id:existing.id},
+            where: { id: existing.id },
         });
 
-        return{
-            message:"Company info deleted successfully"
-        }
-    }
+        await this.redisService.del(COMPANY_INFO_CACHE_KEY);
 
+        return {
+            message: "Company info deleted successfully",
+        };
+    }
 }

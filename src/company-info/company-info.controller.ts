@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Patch, Post, UploadedFile, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Patch, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { CompanyInfoService } from './company-info.service';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -6,6 +6,8 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { CreateCompanyInfoDto } from './dto/create-companyInfo.dto';
 import { UpdateCompanyInfoDto } from './dto/update-companyInfo.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { multerConfig } from '../cloudinary/multer.config';
 
 @Controller('company-info')
 export class CompanyInfoController {
@@ -23,6 +25,7 @@ export class CompanyInfoController {
   @UseGuards(JwtGuard,RolesGuard)
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor("logo",multerConfig))
   async createCompanyInfo(
     @Body() dto:CreateCompanyInfoDto,
     @UploadedFile() logoFile:Express.Multer.File
@@ -34,6 +37,7 @@ export class CompanyInfoController {
   @UseGuards(JwtGuard,RolesGuard)
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor("logo",multerConfig))
   async updateCompanyInfo(
     @Body() dto:UpdateCompanyInfoDto,
     @UploadedFile() logoFile?:Express.Multer.File

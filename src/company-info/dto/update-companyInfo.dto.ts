@@ -15,13 +15,13 @@ export class UpdateCompanyInfoDto{
     officeTelephone?:string;
 
     @IsOptional()
-    @Transform(({value})=>(typeof value==="string"?parseFloat(value):value))
+    @Transform(({value})=>(typeof value==="string"?JSON.parse(value):value))
     @IsArray()
     @IsString({each:true})
     emails?:string[]
 
     @IsOptional()
-    @Transform(({value})=>(typeof value==="string"?parseFloat(value):value))
+    @Transform(({value})=>(typeof value==="string"?JSON.parse(value):value))
     @IsArray()
     @IsOptional()
     phones?:string[];
