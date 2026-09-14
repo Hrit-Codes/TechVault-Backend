@@ -37,7 +37,7 @@ export class ReviewsController {
     @Delete(":id")
     @UseGuards(JwtGuard,RolesGuard)
     @Roles(Role.ADMIN)
-    @HttpCode(HttpStatus.OK)
+    @HttpCode(HttpStatus.NO_CONTENT)
     async deleteReview(
         @Param("id") id:string
     ){

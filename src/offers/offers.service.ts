@@ -4,6 +4,18 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
 import { QueryOfferDto } from './dto/query-offer.dto';
 import { UpdateOfferDto } from './dto/update-offer.dto';
+import { OfferType } from '@prisma/client';
+
+export type ResolveableOffer={
+    id:string;
+    title:string;
+    offerType:OfferType;
+    offerValue:number;
+    productIds:Set<string>;
+    brandIds:Set<string>;
+    categoryIds:Set<string>;
+}
+
 
 @Injectable()
 export class OffersService {
@@ -181,13 +193,23 @@ export class OffersService {
             this.prisma.offer.findMany({
                 where,
                 skip,
+                select:{
+                    id:true,
+                    bannerImage:true,
+                    title:true,
+                    offerType:true,
+                    offerValue:true,
+                    startDate:true,
+                    endDate:true,
+                    isActive:true
+                },
                 take:limit,
                 orderBy:{title:"desc"},
-                include:this.offerInclude
             }),
         ]);
 
         return{
+            message:"Offers fetched succesfully",
             data:offers,
             pagination:{
                 total,
@@ -211,7 +233,8 @@ export class OffersService {
         }
 
         return {
-            offer
+            message:"Offer fetched successfully",
+            data:offer
         }
     }
 
@@ -275,6 +298,97 @@ export class OffersService {
             message:"Offer deleted succesfully",
             data:{id:offer.id, title:offer.title}
         }
+    }
+
+    async getOfferStats(){
+        const now= new Date();
+
+        const [total, active, upcoming,expired]=await Promise.all([
+            this.prisma.offer.count(),
+            this.prisma.offer.count({where:{isActive:true}}),
+            this.prisma.offer.count({where:{startDate:{gt:now}}}),
+            this.prisma.offer.count({where:{endDate:{lt:now}}})
+        ])
+
+        return{
+            message:"Offer stats fetched succesfully",
+            data:{
+                total,
+                active,
+                upcoming,
+                expired
+            }
+        }
+
+    }
+
+    async getActiveOffersForResolution():Promise<ResolveableOffer[]>{
+        const now = new Date();
+
+        const offers=await this.prisma.offer.findMany({
+            where:{
+                isActive:true,
+                startDate:{lte:now},
+                endDate:{gte:now}
+            },
+            select:{
+                id:true,
+                title:true,
+                offerType:true,
+                offerValue:true,
+                products:{ select:{productId:true}},
+                brands:{ select:{brandId:true}},
+                categories:{ select:{categoryId:true}}
+            }
+        })
+
+        return offers.map((o) => ({
+            id: o.id,
+            title: o.title,
+            offerType: o.offerType,
+            offerValue: o.offerValue,
+            productIds: new Set(o.products.map((p) => p.productId)),
+            brandIds: new Set(o.brands.map((b) => b.brandId)),
+            categoryIds: new Set(o.categories.map((c) => c.categoryId)),
+        }));
+    }
+
+    resolveBestOfferForProduct(
+        offers:ResolveableOffer[],
+        product:{ id:string, brandId:string, categoryId:string, price:number}
+    ):{ offer:ResolveableOffer, discountedPrice:number}|null{
+        const matching=offers.filter((o)=>
+            o.productIds.has(product.id) ||
+            o.brandIds.has(product.brandId) ||
+            o.categoryIds.has(product.categoryId),
+        );
+
+        if(matching.length===0) return null;
+
+        let best:{ offer:ResolveableOffer , discountedPrice:number}|null=null;
+
+        for(const offer of matching){
+            const discountedPrice=this.computeDiscountedPrice(
+                product.price,
+                offer.offerType,
+                offer.offerValue
+            );
+            if(!best || discountedPrice<best.discountedPrice){
+                best={offer,discountedPrice}
+            }
+        }
+
+        return best;
+    }
+
+    private computeDiscountedPrice(
+        price:number,
+        offerType:OfferType,
+        offerValue:number
+    ):number{
+        const discounted=offerType==="PERCENTAGE"?price-(price*offerValue)*100:price-offerValue;
+
+        return Math.max(0, Math.round(discounted*100)/100)
     }
 }
 

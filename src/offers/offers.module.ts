@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { OffersService } from './offers.service';
 import { OffersController } from './offers.controller';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({

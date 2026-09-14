@@ -48,7 +48,7 @@ export class CompanyInfoController {
   @Delete()
   @UseGuards(JwtGuard,RolesGuard)
   @Roles(Role.ADMIN)
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   async deleteCompanyInfo(){
     await this.companyInfoService.deleteCompanyInfo();
   }

@@ -34,11 +34,6 @@ export class UpdateProductDto{
     @IsOptional()
     @Transform(({value})=>value==="true"||value===true)
     @IsBoolean()
-    isNew?:boolean;
-
-    @IsOptional()
-    @Transform(({value})=>value==="true"||value===true)
-    @IsBoolean()
     isActive?:boolean;
 
     @IsOptional()
