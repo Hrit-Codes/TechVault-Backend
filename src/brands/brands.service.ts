@@ -7,6 +7,7 @@ import { RedisService } from '../redis/redis.service';
 
 const BRANDS_CACHE_KEY="brands:all";
 const BRANDS_ACTIVE_CACHE_KEY="brands:active";
+const BRANDS_STATS_CACHE_KEY="brands:stats";
 const BRANDS_CACHE_TTL=30*60;
 
 @Injectable()
@@ -18,7 +19,7 @@ export class BrandsService {
   ) {}
 
   private async clearBrandsCache(slug?: string) {
-    const keysToDelete = [BRANDS_CACHE_KEY, BRANDS_ACTIVE_CACHE_KEY];
+    const keysToDelete = [BRANDS_CACHE_KEY, BRANDS_ACTIVE_CACHE_KEY,BRANDS_STATS_CACHE_KEY];
     if (slug) {
       keysToDelete.push(`brands:slug:${slug}`);
     }
@@ -219,4 +220,66 @@ export class BrandsService {
       data: updatedBrand,
     };
   }
+
+  async getBrandStats(){
+    const cached=await this.redisService.get<any>(BRANDS_STATS_CACHE_KEY);
+    if(cached){
+      return{
+        message:"Brand stats fetched succesfully",
+        stats:cached
+      }
+    }
+
+    const [totalBrands, activeBrands, inactiveBrands,brandsWithProducts]=await Promise.all([
+      this.prisma.brand.count(),
+      this.prisma.brand.count({where:{isActive:true}}),
+      this.prisma.brand.count({where:{isActive:false}}),
+      this.prisma.brand.findMany({
+        include:{
+          _count:{select:{products:true}},
+          products:{
+            select:{
+              price:true,
+              stock:true
+            }
+          }
+        }
+      })
+    ]);
+
+    const emptyBrands=brandsWithProducts.filter((b)=>b._count.products===0).length;
+
+    const topByCatalog=brandsWithProducts.sort((a,b)=>b._count.products-a._count.products)[0];
+
+    const topByInventory=brandsWithProducts.map(brand=>({
+      ...brand,
+      inventoryValue:brand.products.reduce(
+        (sum,p)=>sum+p.price*p.stock,0
+      )
+    }))
+    .sort((a,b)=>b.inventoryValue-a.inventoryValue)[0];
+
+    const stats={
+        totalBrands,
+        activeBrands,
+        inactiveBrands,
+        emptyBrands,
+        topByCatalog:topByCatalog?{
+          name:topByCatalog.name,
+          productCount:topByCatalog._count.products
+        }:null,
+        topByInventory:topByInventory?{
+          name:topByInventory.name,
+          inventoryValue:Math.round(topByInventory.inventoryValue*10)/10,
+        }:null,
+    }
+
+    await this.redisService.set(BRANDS_STATS_CACHE_KEY,stats,BRANDS_CACHE_TTL);
+
+    return{
+      message:"Brand stats fetched succesfully",
+      data:stats
+    }
+  }
+  
 }

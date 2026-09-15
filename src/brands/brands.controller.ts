@@ -48,6 +48,14 @@ export class BrandsController {
     return this.brandsService.getAllBrands();
   }
 
+  @Get('admin/stats')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getBrandStats() {
+    return this.brandsService.getBrandStats();
+  }
+
   @Post()
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)
