@@ -8,16 +8,37 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { RedisService } from '../redis/redis.service';
+
+const CATEGORIES_CACHE_KEY="categories:all";
+const CATEGORIES_ACTIVE_CACHE_KEY="categories:active";
+const CATEGORIES_CACHE_TTL=30*60;
 
 @Injectable()
 export class CategoriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly redisService:RedisService
   ) {}
+
+  private async clearCategoriesCache(slug?:string){
+    const keysToDelete=[CATEGORIES_CACHE_KEY, CATEGORIES_ACTIVE_CACHE_KEY];
+    if(slug){
+      keysToDelete.push(`categories:slug:${slug}`);
+    }
+    await this.redisService.del(...keysToDelete);
+  }
 
   // ─── PUBLIC ────────────────────────────────────────────────
   async getActiveCategories() {
+    const cached=await this.redisService.get<any>(CATEGORIES_ACTIVE_CACHE_KEY);
+    if(cached){
+      return{
+        message:"Categories fetched successfully",
+        data:cached
+      }
+    }
     const categories = await this.prisma.category.findMany({
       where: { isActive: true },
       orderBy: { order: 'asc' },
@@ -30,6 +51,8 @@ export class CategoriesService {
       },
     });
 
+    await this.redisService.set(CATEGORIES_ACTIVE_CACHE_KEY,categories,CATEGORIES_CACHE_TTL);
+
     return {
       message: 'Active categories fetched successfully',
       data: categories,
@@ -37,10 +60,21 @@ export class CategoriesService {
   }
 
   async getCategoryBySlug(slug: string) {
+    const cacheKey=`categories:slug:${slug}`;
+    const cached=await this.redisService.get<any>(cacheKey);
+    if(cached){
+      return{
+        message:"Category fetched successfully",
+        data:cached
+      }
+    }
+
     const category = await this.prisma.category.findUnique({
       where: { slug },
     });
     if (!category) throw new NotFoundException('Category not found');
+
+    await this.redisService.set(cacheKey,category,CATEGORIES_CACHE_TTL);
 
     return {
       message: 'Category fetched successfully',
@@ -50,9 +84,19 @@ export class CategoriesService {
 
   // ─── ADMIN ────────────────────────────────────────────────
   async getAllCategories() {
+    const cached=await this.redisService.get(CATEGORIES_CACHE_KEY);
+    if(cached){
+      return{
+        message:"Categories fetched successfully",
+        data:cached
+      }
+    }
+
     const categories = await this.prisma.category.findMany({
       orderBy: { order: 'asc' },
     });
+
+    await this.redisService.set(CATEGORIES_CACHE_KEY, categories, CATEGORIES_CACHE_TTL);
 
     return {
       message: 'Categories fetched successfully',
@@ -117,6 +161,8 @@ export class CategoriesService {
         order: dto.order,
       },
     });
+
+    await this.clearCategoriesCache(); 
 
     return {
       message: 'Category created successfully',
@@ -191,6 +237,12 @@ export class CategoriesService {
       },
     });
 
+    await this.clearCategoriesCache();
+
+    if(updatedCategory.slug!==category.slug){
+      await this.redisService.del(`categories:slug:${updatedCategory.slug}`);
+    }
+
     return {
       message: 'Category updated successfully',
       data: updatedCategory,
@@ -209,6 +261,8 @@ export class CategoriesService {
     }
 
     await this.prisma.category.delete({ where: { id } });
+
+    await this.clearCategoriesCache(category.slug);
   }
 
   async toggleCategoryStatus(id: string) {
@@ -219,6 +273,8 @@ export class CategoriesService {
       where: { id },
       data: { isActive: !category.isActive },
     });
+
+    await this.clearCategoriesCache(category.slug);
 
     return {
       message: `Category ${updatedCategory.isActive ? 'activated' : 'deactivated'} successfully`,
