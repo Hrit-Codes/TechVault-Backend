@@ -4,13 +4,27 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateHeroSectionDto } from './dto/create-hero-section.dto';
 import { TextAlignment } from '@prisma/client';
 import { UpdateHeroSectionDto } from './dto/update-hero-section.dto';
+import { RedisService } from '../redis/redis.service';
+
+const HEROS_CACHE_KEY="heros:all";
+const HEROS_ACTIVE_CACHE_KEY="heros:active";
+const HEROS_CACHE_TTL=30*60;
 
 @Injectable()
 export class HeroSectionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly redisService:RedisService
   ) {}
+
+  private async clearHerosCache(id?:string){
+    const keysToDelete=[HEROS_CACHE_KEY,HEROS_ACTIVE_CACHE_KEY];
+    if(id){
+      keysToDelete.push(`heros:id:${id}`);
+    }
+    await this.redisService.del(...keysToDelete);
+  }
 
   private extractPublicId(url: string, folder: string): string | null {
     const filename = url.split('/').pop()?.split('.')[0];
@@ -19,28 +33,50 @@ export class HeroSectionsService {
 
   // ─── PUBLIC ────────────────────────────────────────────────
   async getActiveHeroSections() {
-    const sections = await this.prisma.heroSection.findMany({
-      where: { isActive: true },
-      orderBy: { order: 'asc' },
-      include: {
-        linkedOffer: true,
-      },
-    });
+    const cached=await this.redisService.get<any>(HEROS_ACTIVE_CACHE_KEY);
+    let sections=cached;
+    if(!sections){
+      sections =await this.prisma.heroSection.findMany({
+        where:{isActive:true},
+        orderBy:{order:"asc"}
+      });
+      await this.redisService.set(HEROS_ACTIVE_CACHE_KEY,sections,HEROS_CACHE_TTL);
+    }
+
+    const offerIds = sections.map((s: any) => s.linkedOfferId).filter(Boolean);
+    const offers = offerIds.length
+      ? await this.prisma.offer.findMany({ where: { id: { in: offerIds } } })
+      : [];
+    const offerMap = new Map(offers.map((o) => [o.id, o]));
+
+    const enriched = sections.map((s: any) => ({
+      ...s,
+      linkedOffer: s.linkedOfferId ? offerMap.get(s.linkedOfferId) ?? null : null,
+    }));
 
     return {
       message: 'Active hero sections fetched successfully',
-      data: sections,
+      data: enriched,
     };
   }
 
   // ─── ADMIN ────────────────────────────────────────────────
   async getAllHeroSections() {
+    const cached=await this.redisService.get<any>(HEROS_CACHE_KEY);
+    if(cached){
+      return{
+         message:"All hero sections fetched successfully",
+         data:cached
+      }
+    }
     const sections = await this.prisma.heroSection.findMany({
       orderBy: { order: 'asc' },
       include: {
         linkedOffer: true,
       },
     });
+
+    await this.redisService.set(HEROS_CACHE_KEY,sections,HEROS_CACHE_TTL);
 
     return {
       message: 'All hero sections fetched successfully',
@@ -49,6 +85,13 @@ export class HeroSectionsService {
   }
 
   async getHeroSectionById(id: string) {
+    const cached=await this.redisService.get(`heros:id:${id}`);
+    if(cached){
+      return{
+        message:"Hero section fetched successfully",
+        data:cached
+      }
+    }
     const section = await this.prisma.heroSection.findUnique({
       where: { id },
       include: {
@@ -59,6 +102,8 @@ export class HeroSectionsService {
     if (!section) {
       throw new NotFoundException('Hero section not found');
     }
+
+    await this.redisService.set(`heros:id:${id}`,section,HEROS_CACHE_TTL);
 
     return {
       message: 'Hero section fetched successfully',
@@ -127,6 +172,8 @@ export class HeroSectionsService {
       },
       include: { linkedOffer: true },
     });
+
+    await this.clearHerosCache();
 
     return {
       message: 'Hero section created successfully',
@@ -209,6 +256,8 @@ export class HeroSectionsService {
       include: { linkedOffer: true },
     });
 
+    await this.clearHerosCache(section.id);
+
     return {
       message: 'Hero section updated successfully',
       data: section,
@@ -228,6 +277,8 @@ export class HeroSectionsService {
       where: { id },
       data: { isActive: !section.isActive },
     });
+
+    await this.clearHerosCache(updated.id);
 
     return {
       message: `Hero section ${updated.isActive ? 'activated' : 'deactivated'} successfully`,
@@ -251,5 +302,7 @@ export class HeroSectionsService {
     await this.prisma.heroSection.delete({
       where: { id },
     });
+
+    await this.clearHerosCache(section.id);
   }
 }
