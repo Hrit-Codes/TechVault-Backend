@@ -12,6 +12,17 @@ import { OffersService } from '../offers/offers.service';
 import { CreateProductVariantDto } from './dto/create-product-variant.dto';
 import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 import { CreateVariantsBulkDto } from './dto/create-variants-bulk.dto';
+import { RedisService } from '../redis/redis.service';
+import { createHash } from 'crypto';
+
+const PRODUCTS_LIST_VERSION_KEY = 'products:list:version';
+const PRODUCTS_LIST_KEY = (version: number, query: string) =>
+  `products:list:v${version}:${query}`;
+const PRODUCTS_SLUG_KEY = (slug: string) => `products:slug:${slug}`;
+const PRODUCTS_VARIANTS_KEY = (id: string) => `products:variants:${id}`;
+
+const PRODUCTS_LIST_TTL = 10 * 60; 
+const PRODUCTS_DETAIL_TTL = 30 * 60; 
 
 @Injectable()
 export class ProductsService {
@@ -19,6 +30,7 @@ export class ProductsService {
     private readonly prisma: PrismaService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly offersService: OffersService,
+    private readonly redisService:RedisService
   ) {}
 
   private readonly NEW_PRODUCT_WINDOW_DAYS = 30;
@@ -78,6 +90,40 @@ export class ProductsService {
     return filename ? `${folder}/${filename}` : null;
   }
 
+  private hashQuery(query: Record<string, unknown>): string {
+      const sorted = Object.keys(query)
+        .sort()
+        .reduce<Record<string, unknown>>((acc, k) => {
+          if (query[k] !== undefined) acc[k] = query[k];
+          return acc;
+        }, {});
+      return createHash('md5').update(JSON.stringify(sorted)).digest('hex').slice(0, 12);
+    }
+
+  private async getProductsListVersion():Promise<number>{
+    const v=await this.redisService.get<number>(PRODUCTS_LIST_VERSION_KEY);
+    return v??1;
+  }
+
+  private async bumpProductsListVersion():Promise<void>{
+    try{
+      await this.redisService.getClient().incr(PRODUCTS_LIST_VERSION_KEY);
+    }catch(err){
+      console.log(`Failed to bump products list version: ${(err as Error).message}`);
+    }
+  }
+
+  private async invalidateProductCaches(opts:{
+    slug?:string;
+    productId?:string
+  }):Promise<void>{
+    const keys:string[]=[];
+    if(opts.slug) keys.push(PRODUCTS_SLUG_KEY(opts.slug));
+    if(opts.productId) keys.push(PRODUCTS_VARIANTS_KEY(opts.productId));
+    if(keys.length) await this.redisService.del(...keys);
+    await this.bumpProductsListVersion();
+  }
+
   // ─── PUBLIC ────────────────────────────────────────────────
   async getProducts(query: QueryProductDto) {
     const {
@@ -130,35 +176,47 @@ export class ProductsService {
               ? { rating: 'desc' }
               : { createdAt: 'desc' };
 
-    const [total, products,activeOffers] = await Promise.all([
-      this.prisma.product.count({ where }),
-      this.prisma.product.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          description: true,
-          price: true,
-          salePrice: true,
-          onSale: true,
-          images: true,
-          badge: true,
-          freeShipping: true,
-          rating: true,
-          reviewCount: true,
-          categoryId: true,
-          brandId: true,
-          createdAt: true,
-        },
-      }),
-      this.offersService.getActiveOffersForResolution(),
-    ]);
+    const version=await this.getProductsListVersion();
+    const cacheKey=PRODUCTS_LIST_KEY(version, this.hashQuery({...query}));
 
-    const productsWithOffers = products
+    type RawList={total:number, products:any[]};
+    let raw=await this.redisService.get<RawList>(cacheKey);
+
+    if(!raw){
+      const [total, products]=await Promise.all([
+        this.prisma.product.count({where}),
+        this.prisma.product.findMany({
+          where,
+          skip,
+          take:limit,
+          orderBy,
+          select:{
+            id:true,
+            name:true,
+            slug:true,
+            description:true,
+            price:true,
+            salePrice:true,
+            onSale:true,
+            images:true,
+            badge:true,
+            freeShipping:true,
+            rating:true,
+            reviewCount:true,
+            categoryId:true,
+            brandId:true,
+            createdAt:true
+          }
+        })
+      ])
+
+      raw={total,products};
+      await this.redisService.set(cacheKey,raw,PRODUCTS_LIST_TTL);
+    }
+
+    const activeOffers=await this.offersService.getActiveOffersForResolution();
+
+    const productsWithOffers = raw.products
       .map((p) => this.withComputedIsNew(p))
       .map((p) => this.attachOfferInfo(p, activeOffers));
 
@@ -166,29 +224,35 @@ export class ProductsService {
       message: 'Products fetched successfully',
       data: productsWithOffers,
       pagination: {
-        total,
+        total:raw.total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
+        totalPages: Math.ceil(raw.total / limit),
+        hasNextPage: page < Math.ceil(raw.total / limit),
         hasPrevPage: page > 1,
       },
     };
   }
 
   async getProductBySlug(slug: string) {
-    const [product,activeOffers] = await Promise.all([
-      this.prisma.product.findUnique({
-        where: { slug },
-        include: {
-          category: { select: { id: true, name: true, slug: true } },
-          brand: { select: { id: true, name: true, slug: true, logo: true } },
+    const cacheKey=PRODUCTS_SLUG_KEY(slug);
+
+    let product=await this.redisService.get<any>(cacheKey);
+
+    if(!product){
+      product=await this.prisma.product.findUnique({
+        where:{slug},
+        include:{
+          category:{ select:{id:true, name:true, slug:true}},
+          brand:{ select:{id:true, name:true, slug:true, logo:true}},
           variants:{where:{isActive:true}}
-        },
-      }),
-      this.offersService.getActiveOffersForResolution()
-    ])
-    if (!product) throw new NotFoundException('Product not found');
+        }
+      });
+      if(!product) throw new NotFoundException("Product nott found");
+      await this.redisService.set(cacheKey,product,PRODUCTS_DETAIL_TTL);
+    }
+
+    const activeOffers=await this.offersService.getActiveOffersForResolution();
 
     const productWithOffer = this.attachOfferInfo(this.withComputedIsNew(product), activeOffers);
 
@@ -386,6 +450,8 @@ export class ProductsService {
         },
     });
 
+    await this.invalidateProductCaches({slug:product.slug});
+
     return {
         message: 'Product created successfully',
         data: this.withComputedIsNew(product),
@@ -470,6 +536,11 @@ export class ProductsService {
       },
     });
 
+    await this.invalidateProductCaches({slug:product.slug, productId:id});
+    if (updatedProduct.slug!==product.slug){
+      await this.redisService.del(PRODUCTS_SLUG_KEY(updatedProduct.slug));
+    }
+
     return {
       message: 'Product updated successfully',
       data: this.withComputedIsNew(updatedProduct),
@@ -490,6 +561,8 @@ export class ProductsService {
     );
 
     await this.prisma.product.delete({ where: { id } });
+
+    await this.invalidateProductCaches({slug:product.slug, productId:id});
   }
 
   async toggleProductStatus(id: string) {
@@ -503,6 +576,8 @@ export class ProductsService {
       data: { isActive: !product.isActive },
     });
 
+    await this.invalidateProductCaches({slug:product.slug, productId:id});
+
     return {
       message: `Product ${updatedProduct.isActive ? 'activated' : 'deactivated'} successfully`,
       data: updatedProduct,
@@ -510,6 +585,11 @@ export class ProductsService {
   }
 
   async getVariants(productId:string){
+    const cacheKey=PRODUCTS_VARIANTS_KEY(productId);
+    
+    const cached=await this.redisService.get<any>(cacheKey);
+    if(cached) return cached;
+
     const product=await this.prisma.product.findUnique({where:{id:productId}});
 
     if(!product) throw new NotFoundException("Product not found");
@@ -519,10 +599,13 @@ export class ProductsService {
       orderBy:[{color:"asc"},{variant:"asc"}]
     });
 
-    return{
+    const response={
       message:"Variants fetched successfully",
       data:variants
     }
+
+    await this.redisService.set(cacheKey,response,PRODUCTS_DETAIL_TTL);
+    return response;
   }
 
   async createVariant(productId:string,dto:CreateProductVariantDto){
@@ -557,6 +640,8 @@ export class ProductsService {
       }
     })
 
+    await this.invalidateProductCaches({productId});
+
     return{
       message:"Variant created successfully",
       data:variant
@@ -581,6 +666,8 @@ export class ProductsService {
       }
     })
 
+    await this.invalidateProductCaches({productId});
+
     return{
       message:"Variant updated successfully",
       data:updated
@@ -595,6 +682,7 @@ export class ProductsService {
     }
 
     await this.prisma.productVariant.delete({where:{id:variantId}});
+    await this.invalidateProductCaches({productId});
   }
 
   async createVariantsBulk(productId:string, dto:CreateVariantsBulkDto){
@@ -643,9 +731,11 @@ export class ProductsService {
       }
     });
 
-  const created = await this.prisma.$transaction(
-    rows.map((row) => this.prisma.productVariant.create({ data: row })),
-  );
+    const created = await this.prisma.$transaction(
+      rows.map((row) => this.prisma.productVariant.create({ data: row })),
+    );
+
+    await this.invalidateProductCaches({productId});
 
     return{
       message:`${created.length} variant(s) created successfully`,
