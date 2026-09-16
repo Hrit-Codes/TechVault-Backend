@@ -37,6 +37,60 @@ export class ProductsService {
 
   private readonly NEW_PRODUCT_WINDOW_DAYS = 30;
 
+  private computeEffectivePrice(
+    basePrice: number,
+    variants?: { isActive: boolean; priceOverride: number | null }[] | null,
+  ): { price: number; minPrice: number; maxPrice: number; hasPriceRange: boolean } {
+    const activeVariants = (variants ?? []).filter((v) => v.isActive);
+
+    if (activeVariants.length === 0) {
+      return { price: basePrice, minPrice: basePrice, maxPrice: basePrice, hasPriceRange: false };
+    }
+
+    const variantPrices = activeVariants.map((v) => v.priceOverride ?? basePrice);
+    const minPrice = Math.min(...variantPrices);
+    const maxPrice = Math.max(...variantPrices);
+
+    return {
+      price: minPrice,
+      minPrice,
+      maxPrice,
+      hasPriceRange: minPrice !== maxPrice,
+    };
+  }
+
+  private withEffectivePrice
+    <T extends { price: number; variants?: { isActive: boolean; priceOverride: number | null }[] },
+  >(product: T): T & { minPrice: number; maxPrice: number; hasPriceRange: boolean } {
+    const { price, minPrice, maxPrice, hasPriceRange } = this.computeEffectivePrice(
+      product.price,
+      product.variants,
+    );
+
+    return { ...product, price, minPrice, maxPrice, hasPriceRange };
+  }
+
+  private computeEffectiveStock(
+    baseStock:number,
+    variants?:{isActive:boolean; stockOverride:number | null}[]|null,
+  ):number{
+    const activeVariants=(variants??[]).filter((v)=>v.isActive);
+
+    if(activeVariants.length===0){
+      return baseStock;
+    }
+    return activeVariants.reduce((sum,v)=>sum+(v.stockOverride??0),0);
+  }
+
+  private withEffectiveStock
+    <T extends { stock: number; variants?: { isActive: boolean; stockOverride: number | null }[] },
+  >(product: T): T {
+    return {
+      ...product,
+      stock: this.computeEffectiveStock(product.stock, product.variants),
+    };
+}
+
   private computeIsNew(createdAt: Date): boolean {
     const ageInMs = Date.now() - createdAt.getTime();
     const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
@@ -204,7 +258,9 @@ export class ProductsService {
             reviewCount:true,
             categoryId:true,
             brandId:true,
-            createdAt:true
+            createdAt:true,
+            stock:true,
+            variants:{select:{isActive:true, stockOverride:true, priceOverride:true}}
           }
         })
       ])
@@ -216,6 +272,8 @@ export class ProductsService {
     const activeOffers=await this.offersService.getActiveOffersForResolution();
 
     const productsWithOffers = raw.products
+      .map((p)=> this.withEffectiveStock(p))
+      .map((p)=>this.withEffectivePrice(p))
       .map((p) => this.withComputedIsNew(p))
       .map((p) => this.attachOfferInfo(p, activeOffers));
 
@@ -253,7 +311,7 @@ export class ProductsService {
 
     const activeOffers=await this.offersService.getActiveOffersForResolution();
 
-    const productWithOffer = this.attachOfferInfo(this.withComputedIsNew(product), activeOffers);
+    const productWithOffer = this.attachOfferInfo(this.withComputedIsNew(this.withEffectivePrice(this.withEffectiveStock(product))), activeOffers);
 
     return {
       message: 'Product fetched successfully',
@@ -348,14 +406,17 @@ export class ProductsService {
           isActive: true,
           createdAt: true,
           updatedAt: true,
+          variants:{select:{isActive:true, stockOverride:true, priceOverride:true}}
         },
       }),
       this.offersService.getActiveOffersForResolution(),
     ]);
 
-    const productsWithOffers = products
-      .map((p) => this.withComputedIsNew(p))
-      .map((p) => this.attachOfferInfo(p, activeOffers));
+  const productsWithOffers = products
+    .map((p) => this.withEffectiveStock(p))
+    .map((p) => this.withEffectivePrice(p))
+    .map((p) => this.withComputedIsNew(p))
+    .map((p) => this.attachOfferInfo(p, activeOffers));
 
     return {
       message: 'All products fetched successfully',
@@ -385,7 +446,7 @@ export class ProductsService {
     ])
     if (!product) throw new NotFoundException('Product not found');
 
-    const productWithOffer = this.attachOfferInfo(this.withComputedIsNew(product), activeOffers);
+    const productWithOffer = this.attachOfferInfo(this.withComputedIsNew(this.withEffectivePrice(this.withEffectiveStock(product))), activeOffers);
 
     return {
       message: 'Product fetched successfully',
