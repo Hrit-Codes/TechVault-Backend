@@ -48,6 +48,14 @@ export class CategoriesController {
     return this.categoriesService.getAllCategories();
   }
 
+  @Get('admin/stats')
+  @UseGuards(JwtGuard,RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getCategoryStats(){
+    return this.categoriesService.getCategoryStats();
+  }
+
   @Post()
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)

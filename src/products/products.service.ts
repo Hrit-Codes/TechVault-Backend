@@ -20,6 +20,8 @@ const PRODUCTS_LIST_KEY = (version: number, query: string) =>
   `products:list:v${version}:${query}`;
 const PRODUCTS_SLUG_KEY = (slug: string) => `products:slug:${slug}`;
 const PRODUCTS_VARIANTS_KEY = (id: string) => `products:variants:${id}`;
+const PRODUCTS_STATS_CACHE_KEY="products:stats";
+const PRODUCTS_STATS_TTL=5*60;
 
 const PRODUCTS_LIST_TTL = 10 * 60; 
 const PRODUCTS_DETAIL_TTL = 30 * 60; 
@@ -41,8 +43,6 @@ export class ProductsService {
     return ageInDays <= this.NEW_PRODUCT_WINDOW_DAYS;
   }
 
-  // Only requires createdAt — isNew (if present on T) is always overwritten anyway,
-  // so it should never be part of the input constraint.
   private withComputedIsNew<T extends { createdAt: Date }>(
     product: T,
   ): T & { isNew: boolean } {
@@ -157,7 +157,6 @@ export class ProductsService {
     if (minPrice !== undefined) where.price = { ...where.price, gte: minPrice };
     if (maxPrice !== undefined) where.price = { ...where.price, lte: maxPrice };
 
-    // isNew is derived from createdAt, not stored — translate the filter into a date range
     if (isNew !== undefined) {
       const cutoff = new Date(Date.now() - this.NEW_PRODUCT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
       where.createdAt = isNew ? { gte: cutoff } : { lt: cutoff };
@@ -740,6 +739,75 @@ export class ProductsService {
     return{
       message:`${created.length} variant(s) created successfully`,
       data:created
+    }
+  }
+
+  async getProductStats(){
+      const cached = await this.redisService.get<any>(PRODUCTS_STATS_CACHE_KEY);
+  if (cached) {
+    return {
+      message: 'Product statistics fetched successfully',
+      data: cached,
+    };
+  }
+
+  const LOW_STOCK_THRESHOLD = 10;
+
+  const [totalProducts, activeProducts, onSale, stockStats] = await Promise.all([
+    this.prisma.product.count(),
+    this.prisma.product.count({ where: { isActive: true } }),
+    this.prisma.product.count({ where: { onSale: true } }),
+
+    this.prisma.$queryRaw<
+      { low_stock: number; out_of_stock: number; inventory_value: number }[]
+    >`
+      WITH product_effective_stock AS (
+        SELECT
+          p.id,
+          p.price,
+          p.stock AS parent_stock,
+          CASE
+            WHEN COUNT(v.id) > 0
+              THEN COALESCE(SUM(COALESCE(v.stock_override, 0)), 0)
+            ELSE p.stock
+          END AS effective_stock,
+          CASE
+            WHEN COUNT(v.id) > 0
+              THEN COALESCE(
+                SUM(COALESCE(v.stock_override, 0) * COALESCE(v.price_override, p.price)),
+                0
+              )
+            ELSE p.price * p.stock
+          END AS inventory_value
+        FROM products p
+        LEFT JOIN product_variants v
+          ON v.product_id = p.id AND v.is_active = true
+        GROUP BY p.id, p.price, p.stock
+      )
+      SELECT
+        COUNT(*) FILTER (
+          WHERE effective_stock > 0 AND effective_stock < ${LOW_STOCK_THRESHOLD}
+        )::int AS low_stock,
+        COUNT(*) FILTER (WHERE effective_stock = 0)::int AS out_of_stock,
+        COALESCE(SUM(inventory_value), 0)::float AS inventory_value
+      FROM product_effective_stock
+    `,
+  ]);
+
+  const stats = {
+    totalProducts,
+    activeProducts,
+    lowStock: stockStats[0]?.low_stock ?? 0,
+    outOfStock: stockStats[0]?.out_of_stock ?? 0,
+    onSale,
+    inventoryValue: stockStats[0]?.inventory_value ?? 0,
+  };
+
+    await this.redisService.set(PRODUCTS_STATS_CACHE_KEY,stats,PRODUCTS_STATS_TTL);
+
+    return{
+      message:"Product statistics fetched succesfully",
+      data:stats
     }
   }
 }

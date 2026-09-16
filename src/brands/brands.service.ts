@@ -9,6 +9,7 @@ const BRANDS_CACHE_KEY="brands:all";
 const BRANDS_ACTIVE_CACHE_KEY="brands:active";
 const BRANDS_STATS_CACHE_KEY="brands:stats";
 const BRANDS_CACHE_TTL=30*60;
+const BRANDS_STATS_TTL=5*60;
 
 @Injectable()
 export class BrandsService {
@@ -225,15 +226,14 @@ export class BrandsService {
     const cached=await this.redisService.get<any>(BRANDS_STATS_CACHE_KEY);
     if(cached){
       return{
-        message:"Brand stats fetched succesfully",
-        stats:cached
+        message:"Brand statistics fetched succesfully",
+        data:cached
       }
     }
 
-    const [totalBrands, activeBrands, inactiveBrands,brandsWithProducts]=await Promise.all([
+    const [totalBrands, activeBrands,brandsWithProducts]=await Promise.all([
       this.prisma.brand.count(),
       this.prisma.brand.count({where:{isActive:true}}),
-      this.prisma.brand.count({where:{isActive:false}}),
       this.prisma.brand.findMany({
         include:{
           _count:{select:{products:true}},
@@ -246,7 +246,7 @@ export class BrandsService {
         }
       })
     ]);
-
+    const inactiveBrands=totalBrands-activeBrands;
     const emptyBrands=brandsWithProducts.filter((b)=>b._count.products===0).length;
 
     const topByCatalog=brandsWithProducts.sort((a,b)=>b._count.products-a._count.products)[0];
@@ -264,20 +264,20 @@ export class BrandsService {
         activeBrands,
         inactiveBrands,
         emptyBrands,
-        topByCatalog:topByCatalog?{
+        topBrandByProducts:topByCatalog?{
           name:topByCatalog.name,
           productCount:topByCatalog._count.products
         }:null,
-        topByInventory:topByInventory?{
+        topBrandByInventoryValue:topByInventory?{
           name:topByInventory.name,
           inventoryValue:Math.round(topByInventory.inventoryValue*10)/10,
         }:null,
     }
 
-    await this.redisService.set(BRANDS_STATS_CACHE_KEY,stats,BRANDS_CACHE_TTL);
+    await this.redisService.set(BRANDS_STATS_CACHE_KEY,stats,BRANDS_STATS_TTL);
 
     return{
-      message:"Brand stats fetched succesfully",
+      message:"Brand statistics fetched succesfully",
       data:stats
     }
   }

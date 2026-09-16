@@ -12,7 +12,9 @@ import { RedisService } from '../redis/redis.service';
 
 const CATEGORIES_CACHE_KEY="categories:all";
 const CATEGORIES_ACTIVE_CACHE_KEY="categories:active";
+const CATEGORIES_STATS_CACHE_KEY="categories:stats"
 const CATEGORIES_CACHE_TTL=30*60;
+const CATEGORIES_STATS_TTL=5*60;
 
 @Injectable()
 export class CategoriesService {
@@ -280,5 +282,78 @@ export class CategoriesService {
       message: `Category ${updatedCategory.isActive ? 'activated' : 'deactivated'} successfully`,
       data: updatedCategory,
     };
+  }
+
+  async getCategoryStats(){
+    const cached=await this.redisService.get<any>(CATEGORIES_STATS_CACHE_KEY);
+    if(cached){
+      return{
+        message:"Category statistics fetched succesfully",
+        data:cached
+      }
+    }
+    const [totalCategories, activeCategories, categoriesWithProducts]=await Promise.all([
+      this.prisma.category.count(),
+      this.prisma.category.count({where:{isActive:true}}),
+      this.prisma.category.findMany({
+        select:{
+          id:true,
+          name:true,
+          slug:true,
+          isActive:true,
+          products:{
+            select:{ price:true, stock:true, onSale:true}
+          }
+        }
+      })
+    ])
+    const inactiveCategories=totalCategories-activeCategories;
+    let emptyCategories=0;
+    let categoriesOnSale=0;
+    let totalInventoryValue=0;
+    let totalProducts=0;
+
+    let topCategory:{ name:string; slug:string; productCount:number}|null=null;
+    let maxProducts=-1;
+
+    for(const cat of categoriesWithProducts){
+      const productCount=cat.products.length;
+      totalProducts+=productCount;
+
+      if(productCount===0) emptyCategories++;
+
+      const hasOnSale=cat.products.some(p=>p.onSale);
+      if(hasOnSale) categoriesOnSale++;
+
+      for(const p of cat.products){
+        totalInventoryValue=p.price*p.stock;
+      }
+
+      if(productCount>maxProducts){
+        maxProducts=productCount;
+        topCategory={name:cat.name, slug:cat.slug, productCount};
+      }
+    }
+
+    const avgProductsPerCategory=totalCategories>0?Number(totalProducts/totalCategories).toFixed((2)):0;
+
+    const stats={
+        totalCategories,
+        activeCategories,
+        inactiveCategories,
+        emptyCategories,
+        categoriesOnSale,
+        totalProducts,
+        avgProductsPerCategory,
+        totalInventoryValue,
+        topCategoryByProducts:topCategory
+    }
+
+    await this.redisService.set(CATEGORIES_STATS_CACHE_KEY,stats, CATEGORIES_STATS_TTL)
+
+    return{
+      message:"Category statistics fetched succesfully",
+      data:stats
+    }
   }
 }

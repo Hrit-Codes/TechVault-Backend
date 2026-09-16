@@ -47,6 +47,14 @@ export class ProductsController {
     return this.productService.getAllProducts(query);
   }
 
+  @Get('admin/stats')
+  @UseGuards(JwtGuard,RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getProductStats(){
+    return this.productService.getProductStats()
+  }
+
   @Get('admin/:id')
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)
