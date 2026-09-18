@@ -14,6 +14,7 @@ import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 import { CreateVariantsBulkDto } from './dto/create-variants-bulk.dto';
 import { RedisService } from '../redis/redis.service';
 import { createHash } from 'crypto';
+import { QueryNewProductDto } from './dto/query-new-product.dto';
 
 const PRODUCTS_LIST_VERSION_KEY = 'products:list:version';
 const PRODUCTS_LIST_KEY = (version: number, query: string) =>
@@ -91,8 +92,10 @@ export class ProductsService {
     };
 }
 
-  private computeIsNew(createdAt: Date): boolean {
-    const ageInMs = Date.now() - createdAt.getTime();
+  private computeIsNew(createdAt: Date | string): boolean {
+    const createdDate = createdAt instanceof Date ? createdAt : new Date(createdAt);
+    
+    const ageInMs = Date.now() - createdDate.getTime();
     const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
     return ageInDays <= this.NEW_PRODUCT_WINDOW_DAYS;
   }
@@ -870,5 +873,76 @@ export class ProductsService {
       message:"Product statistics fetched succesfully",
       data:stats
     }
+  }
+
+  async getNewProducts(query:QueryNewProductDto) {
+    const {page=1, limit=12}=query;
+    const skip = (page - 1) * limit;
+    const cutoff = new Date(Date.now() - this.NEW_PRODUCT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    const where: any = {
+      isActive: true,
+      createdAt: { gte: cutoff },
+    };
+
+    const cacheKey = `products:new:${page}:${limit}`;
+
+    type RawList = { total: number; products: any[] };
+    let raw = await this.redisService.get<RawList>(cacheKey);
+
+    if (!raw) {
+      const [total, products] = await Promise.all([
+        this.prisma.product.count({ where }),
+        this.prisma.product.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+            price: true,
+            salePrice: true,
+            onSale: true,
+            images: true,
+            badge: true,
+            freeShipping: true,
+            rating: true,
+            reviewCount: true,
+            categoryId: true,
+            brandId: true,
+            createdAt: true,
+            stock: true,
+            variants: { select: { isActive: true, stockOverride: true, priceOverride: true } },
+          },
+        }),
+      ]);
+
+      raw = { total, products };
+      await this.redisService.set(cacheKey, raw, PRODUCTS_LIST_TTL);
+    }
+
+    const activeOffers = await this.offersService.getActiveOffersForResolution();
+
+    const productsWithOffers = raw.products
+      .map((p) => this.withEffectiveStock(p))
+      .map((p) => this.withEffectivePrice(p))
+      .map((p) => this.withComputedIsNew(p))
+      .map((p) => this.attachOfferInfo(p, activeOffers));
+
+    return {
+      message: 'New products fetched successfully',
+      data: productsWithOffers,
+      pagination: {
+        total: raw.total,
+        page,
+        limit,
+        totalPages: Math.ceil(raw.total / limit),
+        hasNextPage: page < Math.ceil(raw.total / limit),
+        hasPrevPage: page > 1,
+      },
+    };
   }
 }

@@ -26,6 +26,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateVariantsBulkDto } from './dto/create-variants-bulk.dto';
 import { CreateProductVariantDto } from './dto/create-product-variant.dto';
 import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
+import { QueryNewProductDto } from './dto/query-new-product.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -36,6 +37,12 @@ export class ProductsController {
   @HttpCode(HttpStatus.OK)
   async getProducts(@Query() query: QueryProductDto) {
     return this.productService.getProducts(query);
+  }
+
+  @Get("new")
+  @HttpCode(HttpStatus.OK)
+  async getNewProducts(@Query() query: QueryNewProductDto) {
+    return this.productService.getNewProducts(query);
   }
 
   // ========== ADMIN ==========
