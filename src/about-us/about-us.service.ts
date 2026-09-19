@@ -2,17 +2,22 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateFaqItemDto, CreatePromiseItemDto, UpdateFaqItemDto, UpdatePromiseItemDto, UpsertAboutUsStoryDto } from './dto/aboutUs.dto';
+import { RedisService } from '../redis/redis.service';
 
 const MIN_PROMISE_ITEMS = 4;
 const MAX_PROMISE_ITEMS = 8;
 const MIN_FAQ_ITEMS = 4;
 const MAX_FAQ_ITEMS = 8;
 
+const ABOUT_US_CACHE_KEY = "aboutus:page";
+const ABOUT_US_CACHE_TTL = 30 * 60; 
+
 @Injectable()
 export class AboutUsService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly cloudinaryService: CloudinaryService,
+        private readonly redisService:RedisService
     ) {}
 
     private extractPublicId(url: string, folder: string): string | null {
@@ -183,5 +188,30 @@ export class AboutUsService {
 
         await this.prisma.faqItem.delete({ where: { id } });
         return { message: "FAQ item deleted successfully" };
+    }
+
+    async getAboutUsPage(){
+        const cached=await this.redisService.get<any>(ABOUT_US_CACHE_KEY);
+        if(cached){
+            return{
+                message:"About Us content fetched succesfully",
+                data:cached
+            }
+        }
+
+        const [story, promises, faqs]=await Promise.all([
+            this.prisma.aboutUsStory.findFirst(),
+            this.prisma.promiseItem.findMany({orderBy:{order:"asc"}}),
+            this.prisma.faqItem.findMany({orderBy:{order:"asc"}})
+        ])
+
+        const data={ story, promises, faqs};
+
+        await this.redisService.set(ABOUT_US_CACHE_KEY,data,ABOUT_US_CACHE_TTL);
+
+        return{
+            message:"About Us content fetched succesfully",
+            data
+        }
     }
 }

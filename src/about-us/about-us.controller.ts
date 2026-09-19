@@ -28,6 +28,12 @@ export class AboutUsController {
 
     // ============ Public ============
 
+    @Get()
+    @HttpCode(HttpStatus.OK)
+    async getAboutUsPage(){
+        return this.aboutUsService.getAboutUsPage();
+    }
+
     @Get("story")
     @HttpCode(HttpStatus.OK)
     async getStory() {
