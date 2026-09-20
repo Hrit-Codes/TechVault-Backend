@@ -9,6 +9,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import { GoogleGuard } from '../common/guards/google.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -33,6 +35,13 @@ export class AuthController {
     private clearTokenCookies(res: Response) {
         res.clearCookie('access_token');
         res.clearCookie('refresh_token');
+    }
+
+    @Get("me")
+    @UseGuards(JwtGuard,RolesGuard)
+    @HttpCode(HttpStatus.OK)
+    async getCurrentUser(@GetUser() user:any){
+        return this.authService.getCurrentUser(user.id);
     }
 
     @Post('register/initiate')
@@ -97,6 +106,16 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     async resetPassword(@Body() dto: ResetPasswordDto) {
         return this.authService.resetPassword(dto);
+    }
+
+    @Post("change-password")
+    @UseGuards(JwtGuard,RolesGuard)
+    @HttpCode(HttpStatus.OK)
+    async changePassword(
+        @GetUser() user:any,
+        @Body() dto:ChangePasswordDto
+    ){
+        return this.authService.changePassword(user.id,dto)
     }
 
     @Get("google")
