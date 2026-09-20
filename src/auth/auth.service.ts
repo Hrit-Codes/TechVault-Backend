@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import * as argon2 from 'argon2';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -176,6 +177,56 @@ export class AuthService {
         avatar:user.avatar
       },
       ...tokens
+    }
+  }
+
+  async getCurrentUser(userId:string){
+    const user=await this.usersService.findById(userId);
+
+    if(!user){
+      throw new NotFoundException("User not found");
+    }
+
+    return{
+      message:"User fetched succesfully",
+      user:{
+        id:user.id,
+        fullName:user.fullName,
+        email:user.email,
+        phoneNumber:user.phoneNumber,
+        role:user.role,
+        isVerified:user.isVerified,
+        avatar:user.avatar
+      }
+    }
+  }
+
+  async changePassword(userId:string, dto:ChangePasswordDto){
+    const user=await this.usersService.findById(userId);
+
+    if(!user){
+      throw new NotFoundException("User not found");
+    }
+
+    const isCurrentPasswordValid=await argon2.verify(user.password, dto.currentPassword);
+
+    if(!isCurrentPasswordValid){
+      throw new UnauthorizedException('Incorrect current password');
+    }
+
+    const hashedNewPassword=await argon2.hash(dto.newPassword,{
+      type:argon2.argon2id,
+      memoryCost:2**16,
+      timeCost:3,
+      parallelism:4
+    })
+
+    await this.usersService.updatePasswordById(userId,hashedNewPassword);
+
+    await this.usersService.clearRefreshToken(userId);
+
+    return{
+      message:"Password changed succesfully. Please log in again on other devices."
     }
   }
 }
