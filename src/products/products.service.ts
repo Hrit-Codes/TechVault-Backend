@@ -191,6 +191,8 @@ export class ProductsService {
       brandSlug,
       minPrice,
       maxPrice,
+      minRating,
+      maxRating,
       isNew,
       onSale,
       sortBy,
@@ -213,6 +215,11 @@ export class ProductsService {
     if (brandSlug) where.brand = { slug: brandSlug };
     if (minPrice !== undefined) where.price = { ...where.price, gte: minPrice };
     if (maxPrice !== undefined) where.price = { ...where.price, lte: maxPrice };
+    if (minRating !== undefined || maxRating !==undefined){
+      where.rating={};
+      if(minRating !== undefined) where.rating.gte=minRating;
+      if(maxRating !==undefined) where.rating.lte=maxRating;
+    }
 
     if (isNew !== undefined) {
       const cutoff = new Date(Date.now() - this.NEW_PRODUCT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -332,6 +339,8 @@ export class ProductsService {
       brandId,
       minPrice,
       maxPrice,
+      minRating,
+      maxRating,
       isActive,
       stockStatus,
       onSale,
@@ -358,6 +367,11 @@ export class ProductsService {
       where.price = {};
       if (minPrice !== undefined) where.price.gte = minPrice;
       if (maxPrice !== undefined) where.price.lte = maxPrice;
+    }
+    if(minRating !== undefined || maxRating !== undefined){
+      where.rating={}
+      if(minRating !==undefined) where.minRating.gte=minRating;
+      if(maxRating !==undefined) where.maxRating.gte=maxRating;
     }
     if (onSale !== undefined) {
       where.onSale = onSale;

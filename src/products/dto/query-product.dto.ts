@@ -1,5 +1,5 @@
 import { Transform } from "class-transformer";
-import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, Min, Max } from "class-validator";
 
 export class QueryProductDto{
     @IsOptional()
@@ -31,6 +31,20 @@ export class QueryProductDto{
     @Transform(({value})=>parseFloat(value))
     @IsNumber()
     maxPrice?:number;
+
+    @IsOptional()
+    @Transform(({value})=>parseFloat(value))
+    @IsNumber()
+    @Min(0)
+    @Max(5)
+    minRating?:number;
+
+    @IsOptional()
+    @Transform(({value})=>parseFloat(value))
+    @IsNumber()
+    @Min(0)
+    @Max(5)
+    maxRating?:number;
 
     @IsOptional()
     @Transform(({value})=>{

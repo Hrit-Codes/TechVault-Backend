@@ -386,7 +386,7 @@ export class OffersService {
         offerType:OfferType,
         offerValue:number
     ):number{
-        const discounted=offerType==="PERCENTAGE"?price-(price*offerValue)*100:price-offerValue;
+        const discounted=offerType==="PERCENTAGE"?price-(price*offerValue)/100:price-offerValue;
 
         return Math.max(0, Math.round(discounted*100)/100)
     }
