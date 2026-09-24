@@ -23,6 +23,7 @@ import { multerConfig } from '../cloudinary/multer.config';
 import { CreateOfferDto } from './dto/create-offer.dto';
 import { UpdateOfferDto } from './dto/update-offer.dto';
 import { QueryOfferDto } from './dto/query-offer.dto';
+import { QueryOfferProductsDto } from './dto/query-offer-products.dto';
 
 @Controller('offers')
 export class OffersController {
@@ -33,6 +34,15 @@ export class OffersController {
   @HttpCode(HttpStatus.OK)
   async getActiveOffers(@Query() query: QueryOfferDto) {
     return this.offersService.getActiveOffers(query);
+  }
+
+  @Get(":id/products")
+  @HttpCode(HttpStatus.OK)
+  async getOfferProducts( 
+    @Param("id") id:string,
+    @Query() query:QueryOfferProductsDto
+  ){
+    return this.offersService.getActiveOfferByIdWithProducts(id,query);
   }
 
   // ========== ADMIN ==========
