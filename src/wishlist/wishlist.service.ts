@@ -1,17 +1,30 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OffersService } from '../offers/offers.service';
+import { attachOfferInfo, withComputedIsNew, withEffectivePrice, withEffectiveStock } from '../products/utils/product-decorators';
+import { GetWishlistDto } from './dto/get-wishlist.dto';
 
 @Injectable()
 export class WishlistService {
     constructor(
-        private readonly prismaService:PrismaService
+        private readonly prismaService:PrismaService,
+        private readonly offersService:OffersService
     ){}
 
-    async getWishlist(userId:string){
-        const wishlist = this.prismaService.wishlistItem.findMany({
+    async getWishlist(userId:string,query:GetWishlistDto){
+        const {page=1,limit=12}=query;
+        const skip=(page-1)*limit;
+
+        const [total,wishlist] =await Promise.all([
+            this.prismaService.wishlistItem.count({where:{userId}}),
+            this.prismaService.wishlistItem.findMany({
             where:{userId},
+            skip,
+            take:limit,
+            orderBy:{createdAt:"asc"},
             select:{
                 id:true,
+                createdAt:true,
                 product:{
                     select:{
                         id:true,
@@ -20,16 +33,44 @@ export class WishlistService {
                         price:true,
                         salePrice:true,
                         onSale:true,
-                        images:true
+                        images:true,
+                        badge:true,
+                        freeShipping:true,
+                        rating:true,
+                        reviewCount:true,
+                        createdAt:true,
+                        stock:true,
+                        categoryId:true,
+                        brandId:true,
+                        variants:{
+                            select:{isActive:true, priceOverride:true, stockOverride:true}
+                        }
                     }
-                },
-                createdAt:true
+                }
             }
         })
+        ])
+
+        const activeOffers=await this.offersService.getActiveOffersForResolution();
+
+        const decoratedWishlist=wishlist.map((item)=>({
+            ...item,
+            product:attachOfferInfo(withComputedIsNew(withEffectivePrice(withEffectiveStock(item.product))),
+            activeOffers,
+        )
+        }))
 
         return{
             message:"Wishlist fetched successfully",
-            wishlist
+            data:decoratedWishlist,
+            pagination:{
+                total,
+                page,
+                limit,
+                totalPages:Math.ceil(total/limit),
+                hasNextPage:page<Math.ceil(total/limit),
+                hasPrevPage:page>1
+            }
         }
     }
 
@@ -61,10 +102,7 @@ export class WishlistService {
         })
 
         return {
-            message:{
-                message:"Added to wishlist",
-                wishlistItem
-            }
+            message:"Added to wishlist",
         }
     }
 
