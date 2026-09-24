@@ -15,6 +15,13 @@ import { CreateVariantsBulkDto } from './dto/create-variants-bulk.dto';
 import { RedisService } from '../redis/redis.service';
 import { createHash } from 'crypto';
 import { QueryNewProductDto } from './dto/query-new-product.dto';
+import {
+  withEffectivePrice,
+  withEffectiveStock,
+  withComputedIsNew,
+  NEW_PRODUCT_WINDOW_DAYS,
+  attachOfferInfo
+} from './utils/product-decorators';
 
 const PRODUCTS_LIST_VERSION_KEY = 'products:list:version';
 const PRODUCTS_LIST_KEY = (version: number, query: string) =>
@@ -35,104 +42,6 @@ export class ProductsService {
     private readonly offersService: OffersService,
     private readonly redisService:RedisService
   ) {}
-
-  private readonly NEW_PRODUCT_WINDOW_DAYS = 30;
-
-  private computeEffectivePrice(
-    basePrice: number,
-    variants?: { isActive: boolean; priceOverride: number | null }[] | null,
-  ): { price: number; minPrice: number; maxPrice: number; hasPriceRange: boolean } {
-    const activeVariants = (variants ?? []).filter((v) => v.isActive);
-
-    if (activeVariants.length === 0) {
-      return { price: basePrice, minPrice: basePrice, maxPrice: basePrice, hasPriceRange: false };
-    }
-
-    const variantPrices = activeVariants.map((v) => v.priceOverride ?? basePrice);
-    const minPrice = Math.min(...variantPrices);
-    const maxPrice = Math.max(...variantPrices);
-
-    return {
-      price: minPrice,
-      minPrice,
-      maxPrice,
-      hasPriceRange: minPrice !== maxPrice,
-    };
-  }
-
-  private withEffectivePrice
-    <T extends { price: number; variants?: { isActive: boolean; priceOverride: number | null }[] },
-  >(product: T): T & { minPrice: number; maxPrice: number; hasPriceRange: boolean } {
-    const { price, minPrice, maxPrice, hasPriceRange } = this.computeEffectivePrice(
-      product.price,
-      product.variants,
-    );
-
-    return { ...product, price, minPrice, maxPrice, hasPriceRange };
-  }
-
-  private computeEffectiveStock(
-    baseStock:number,
-    variants?:{isActive:boolean; stockOverride:number | null}[]|null,
-  ):number{
-    const activeVariants=(variants??[]).filter((v)=>v.isActive);
-
-    if(activeVariants.length===0){
-      return baseStock;
-    }
-    return activeVariants.reduce((sum,v)=>sum+(v.stockOverride??0),0);
-  }
-
-  private withEffectiveStock
-    <T extends { stock: number; variants?: { isActive: boolean; stockOverride: number | null }[] },
-  >(product: T): T {
-    return {
-      ...product,
-      stock: this.computeEffectiveStock(product.stock, product.variants),
-    };
-}
-
-  private computeIsNew(createdAt: Date | string): boolean {
-    const createdDate = createdAt instanceof Date ? createdAt : new Date(createdAt);
-    
-    const ageInMs = Date.now() - createdDate.getTime();
-    const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
-    return ageInDays <= this.NEW_PRODUCT_WINDOW_DAYS;
-  }
-
-  private withComputedIsNew<T extends { createdAt: Date }>(
-    product: T,
-  ): T & { isNew: boolean } {
-    return { ...product, isNew: this.computeIsNew(product.createdAt) };
-  }
-
-  private attachOfferInfo<T extends{
-    id:string,
-    brandId:string,
-    categoryId:string,
-    price:number,
-    onSale:boolean,
-    salePrice:number|null
-  },>(
-    product:T,
-    activeOffers:Awaited<ReturnType<OffersService[`getActiveOffersForResolution`]>>,
-  ){
-    const resolved=this.offersService.resolveBestOfferForProduct(activeOffers, product);
-
-    if(resolved){
-      return{
-        ...product,
-        onSale:true,
-        salePrice:resolved.discountedPrice,
-        appliedOffer:{ id:resolved.offer.id, title:resolved.offer.title}
-      }
-    }
-
-    return{
-      ...product,
-      appliedOffer:null,
-    }
-  }
 
   private generateSlug(name: string): string {
     return name
@@ -222,7 +131,7 @@ export class ProductsService {
     }
 
     if (isNew !== undefined) {
-      const cutoff = new Date(Date.now() - this.NEW_PRODUCT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+      const cutoff = new Date(Date.now() - NEW_PRODUCT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
       where.createdAt = isNew ? { gte: cutoff } : { lt: cutoff };
     }
 
@@ -282,10 +191,10 @@ export class ProductsService {
     const activeOffers=await this.offersService.getActiveOffersForResolution();
 
     const productsWithOffers = raw.products
-      .map((p)=> this.withEffectiveStock(p))
-      .map((p)=>this.withEffectivePrice(p))
-      .map((p) => this.withComputedIsNew(p))
-      .map((p) => this.attachOfferInfo(p, activeOffers));
+      .map((p)=> withEffectiveStock(p))
+      .map((p)=>withEffectivePrice(p))
+      .map((p) => withComputedIsNew(p))
+      .map((p) => attachOfferInfo(p, activeOffers));
 
     return {
       message: 'Products fetched successfully',
@@ -321,7 +230,7 @@ export class ProductsService {
 
     const activeOffers=await this.offersService.getActiveOffersForResolution();
 
-    const productWithOffer = this.attachOfferInfo(this.withComputedIsNew(this.withEffectivePrice(this.withEffectiveStock(product))), activeOffers);
+    const productWithOffer = attachOfferInfo(withComputedIsNew(withEffectivePrice(withEffectiveStock(product))), activeOffers);
 
     return {
       message: 'Product fetched successfully',
@@ -430,10 +339,10 @@ export class ProductsService {
     ]);
 
   const productsWithOffers = products
-    .map((p) => this.withEffectiveStock(p))
-    .map((p) => this.withEffectivePrice(p))
-    .map((p) => this.withComputedIsNew(p))
-    .map((p) => this.attachOfferInfo(p, activeOffers));
+    .map((p) => withEffectiveStock(p))
+    .map((p) => withEffectivePrice(p))
+    .map((p) => withComputedIsNew(p))
+    .map((p) => attachOfferInfo(p, activeOffers));
 
     return {
       message: 'All products fetched successfully',
@@ -463,7 +372,7 @@ export class ProductsService {
     ])
     if (!product) throw new NotFoundException('Product not found');
 
-    const productWithOffer = this.attachOfferInfo(this.withComputedIsNew(this.withEffectivePrice(this.withEffectiveStock(product))), activeOffers);
+    const productWithOffer = attachOfferInfo(withComputedIsNew(withEffectivePrice(withEffectiveStock(product))), activeOffers);
 
     return {
       message: 'Product fetched successfully',
@@ -531,7 +440,7 @@ export class ProductsService {
 
     return {
         message: 'Product created successfully',
-        data: this.withComputedIsNew(product),
+        data: withComputedIsNew(product),
     };
     }
 
@@ -620,7 +529,7 @@ export class ProductsService {
 
     return {
       message: 'Product updated successfully',
-      data: this.withComputedIsNew(updatedProduct),
+      data: withComputedIsNew(updatedProduct),
     };
   }
 
@@ -892,7 +801,7 @@ export class ProductsService {
   async getNewProducts(query:QueryNewProductDto) {
     const {page=1, limit=12}=query;
     const skip = (page - 1) * limit;
-    const cutoff = new Date(Date.now() - this.NEW_PRODUCT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const cutoff = new Date(Date.now() - NEW_PRODUCT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
     const where: any = {
       isActive: true,
@@ -941,10 +850,10 @@ export class ProductsService {
     const activeOffers = await this.offersService.getActiveOffersForResolution();
 
     const productsWithOffers = raw.products
-      .map((p) => this.withEffectiveStock(p))
-      .map((p) => this.withEffectivePrice(p))
-      .map((p) => this.withComputedIsNew(p))
-      .map((p) => this.attachOfferInfo(p, activeOffers));
+      .map((p) => withEffectiveStock(p))
+      .map((p) => withEffectivePrice(p))
+      .map((p) => withComputedIsNew(p))
+      .map((p) => attachOfferInfo(p, activeOffers));
 
     return {
       message: 'New products fetched successfully',
