@@ -1,21 +1,23 @@
-import { Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { WishlistService } from './wishlist.service';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { GetUser } from '../common/decorators/get-user.decorator';
+import { GetWishlistDto } from './dto/get-wishlist.dto';
 
 @Controller('wishlist')
+@UseGuards(JwtGuard)
 export class WishlistController {
     constructor(
         private readonly wishlistService:WishlistService
     ){}
 
     @Get()
-    @UseGuards(JwtGuard)
     @HttpCode(HttpStatus.OK)
     async getWishlist(
-        @GetUser("id") userId:string
+        @GetUser("id") userId:string,
+        @Query() query:GetWishlistDto,
     ){
-        return this.wishlistService.getWishlist(userId);
+        return this.wishlistService.getWishlist(userId,query);
     }
 
     @Post(":productId")
