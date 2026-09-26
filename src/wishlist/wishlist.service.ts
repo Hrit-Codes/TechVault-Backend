@@ -19,6 +19,9 @@ export class WishlistService {
             this.prismaService.wishlistItem.count({where:{userId}}),
             this.prismaService.wishlistItem.findMany({
             where:{userId},
+
+
+            
             skip,
             take:limit,
             orderBy:{createdAt:"asc"},
