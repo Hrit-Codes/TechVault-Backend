@@ -19,6 +19,7 @@ export class CloudinaryService {
         folder: string = 'techvault',
     ): Promise<UploadApiResponse> {
         if (!file) throw new BadRequestException('No file provided');
+        console.log(`[CloudinaryService] Received file: ${file.originalname}, ${(file.size / 1024 / 1024).toFixed(2)} MB`);
 
         return new Promise((resolve, reject) => {
             const uploadStream = cloudinary.uploader.upload_stream(

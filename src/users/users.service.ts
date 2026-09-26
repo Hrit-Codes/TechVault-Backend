@@ -223,7 +223,7 @@ export class UsersService {
         avatar: true,
       },
     });
-    return { message: 'Avatar updated successfully', data: updatedUser };
+    return { message: 'Avatar updated successfully' };
   }
 
   async updatePassword(userId: string, dto: ChangePasswordDto): Promise<any> {

@@ -27,8 +27,8 @@ async function bootstrap() {
   app.enableCors({
     origin:allowedOrigins,
     credentials:true,
-    method:["GET","POST","PATCH","PUT","DELETE","OPTIONS"],
-    allowedHeaders:["Content-Type","Authorizations"]
+    methods:["GET","POST","PATCH","PUT","DELETE","OPTIONS"],
+    allowedHeaders:["Content-Type","Authorization"]
   });
   app.useGlobalInterceptors(new TransformInterceptor())
   await app.listen(process.env.PORT ?? 3000);
