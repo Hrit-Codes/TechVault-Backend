@@ -4,6 +4,8 @@ import { OfferType } from "@prisma/client";
 type VariantPriceInfo = {
   isActive: boolean;
   priceOverride: number | null;
+  price?: number;
+  salePrice?: number | null;
 };
 
 type VariantStockInfo = {
@@ -31,12 +33,21 @@ export function computeEffectivePrice(
 
 export function withEffectivePrice<
   T extends { price: number; variants?: VariantPriceInfo[] },
->(product: T): T & { minPrice: number; maxPrice: number; hasPriceRange: boolean } {
+>(product: T): T & {
+  minPrice: number;
+  maxPrice: number;
+  hasPriceRange: boolean;
+  variants?: Array<VariantPriceInfo & { price: number }>;
+} {
   const { price, minPrice, maxPrice, hasPriceRange } = computeEffectivePrice(
     product.price,
     product.variants,
   );
-  return { ...product, price, minPrice, maxPrice, hasPriceRange };
+  const variants = product.variants?.map((variant) => ({
+    ...variant,
+    price: variant.priceOverride ?? product.price,
+  }));
+  return { ...product, variants, price, minPrice, maxPrice, hasPriceRange };
 }
 
 // ─── Stock ─────────────────────────────────────────────────
@@ -137,24 +148,40 @@ export function attachOfferInfo<
     price: number;
     onSale: boolean;
     salePrice: number | null;
+    variants?: VariantPriceInfo[];
   },
 >(
   product: T,
   activeOffers: ResolveableOffer[],
-): T & { appliedOffer: { id: string; title: string } | null } {
+): T & {
+  appliedOffer: { id: string; title: string } | null;
+  variants?: Array<VariantPriceInfo & { price: number; salePrice: number | null }>;
+} {
   const resolved = resolveBestOfferForProduct(activeOffers, product);
+  const variants = product.variants?.map((variant) => {
+    const price = variant.price ?? variant.priceOverride ?? product.price;
+    return {
+      ...variant,
+      price,
+      salePrice: resolved
+        ? computeDiscountedPrice(price, resolved.offer.offerType, resolved.offer.offerValue)
+        : null,
+    };
+  });
 
   if (resolved) {
     return {
       ...product,
       onSale: true,
       salePrice: resolved.discountedPrice,
+      variants,
       appliedOffer: { id: resolved.offer.id, title: resolved.offer.title },
     };
   }
 
   return {
     ...product,
+    variants,
     appliedOffer: null,
   };
 }
