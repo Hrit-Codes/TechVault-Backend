@@ -1,5 +1,11 @@
 import { Transform } from "class-transformer";
-import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, Min, Max } from "class-validator";
+import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, Min, Max, IsArray } from "class-validator";
+
+function toStringArray({value}:{value:unknown}){
+    if(value===undefined || value===null || value==="") return undefined;
+    if (Array.isArray(value)) return value.map(String);
+    return String(value).split(",").map((v)=>v.trim()).filter(Boolean);
+}
 
 export class QueryProductDto{
     @IsOptional()
@@ -7,20 +13,28 @@ export class QueryProductDto{
     search?:string;
 
     @IsOptional()
-    @IsString()
-    categoryId?:string;
+    @Transform(toStringArray)
+    @IsArray()
+    @IsString({each:true})
+    categoryId?:string[];
     
     @IsOptional()
-    @IsString()
-    categorySlug?:string;
+    @Transform(toStringArray)
+    @IsArray()
+    @IsString({each:true})
+    categorySlug?:string[];
 
     @IsOptional()
-    @IsString()
-    brandId?:string;
+    @Transform(toStringArray)
+    @IsArray()
+    @IsString({each:true})
+    brandId?:string[];
 
     @IsOptional()
-    @IsString()
-    brandSlug?:string;
+    @Transform(toStringArray)
+    @IsArray()
+    @IsString({each:true})
+    brandSlug?:string[];
 
     @IsOptional()
     @Transform(({value})=>parseFloat(value))

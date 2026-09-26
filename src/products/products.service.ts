@@ -118,10 +118,10 @@ export class ProductsService {
         { description: { contains: search, mode: 'insensitive' } },
       ];
     }
-    if (categoryId) where.categoryId = categoryId;
-    if (categorySlug) where.category = { slug: categorySlug };
-    if (brandId) where.brandId = brandId;
-    if (brandSlug) where.brand = { slug: brandSlug };
+    if (categoryId?.length) where.categoryId = {in:categoryId};
+    if (categorySlug?.length) where.category = { slug: {in:categorySlug} };
+    if (brandId?.length) where.brandId = {in:brandId};
+    if (brandSlug?.length) where.brand = { slug: {in:brandSlug} };
     if (minPrice !== undefined) where.price = { ...where.price, gte: minPrice };
     if (maxPrice !== undefined) where.price = { ...where.price, lte: maxPrice };
     if (minRating !== undefined || maxRating !==undefined){
@@ -266,11 +266,11 @@ export class ProductsService {
         { description: { contains: search, mode: 'insensitive' } },
       ];
     }
-    if (categoryId !== undefined) {
-      where.categoryId = categoryId;
+    if (categoryId?.length) {
+      where.categoryId = {in:categoryId};
     }
-    if (brandId !== undefined) {
-      where.brandId = brandId;
+    if (brandId?.length) {
+      where.brandId = {in:brandId};
     }
     if (minPrice !== undefined || maxPrice !== undefined) {
       where.price = {};
