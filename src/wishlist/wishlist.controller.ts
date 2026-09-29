@@ -20,6 +20,14 @@ export class WishlistController {
         return this.wishlistService.getWishlist(userId,query);
     }
 
+    @Get("ids")
+    @HttpCode(HttpStatus.OK)
+    async getWishlistProductIds(
+        @GetUser() user:any
+    ){
+        return this.wishlistService.getWishlistIds(user.id);
+    }
+
     @Post(":productId")
     @HttpCode(HttpStatus.CREATED)
     async addToWishlist(

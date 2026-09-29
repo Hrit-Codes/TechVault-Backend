@@ -12,6 +12,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy,"google"){
             clientID:configService.get<string>("GOOGLE_CLIENT_ID")!,
             clientSecret:configService.get<string>("GOOGLE_CLIENT_SECRET")!,
             callbackURL:configService.get<string>("GOOGLE_CALLBACK_URL")!,
+            // The list of permissions the app requests
             scope:["email","profile"]
         })
     }

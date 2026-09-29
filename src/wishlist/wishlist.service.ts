@@ -77,6 +77,17 @@ export class WishlistService {
         }
     }
 
+    async getWishlistIds(userId:string):Promise<{data:string[]}>{
+        const rows=await this.prismaService.wishlistItem.findMany({
+            where:{userId},
+            select:{productId:true}
+        });
+
+        return{
+            data:rows.map((r)=>r.productId),
+        }
+    }
+
     async addToWishlist(userId:string, productId:string){
         const product=await this.prismaService.product.findUnique({
             where:{id:productId}
