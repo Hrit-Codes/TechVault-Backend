@@ -3,6 +3,7 @@ import { WishlistService } from './wishlist.service';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import { GetWishlistDto } from './dto/get-wishlist.dto';
+import { GetRecommendationsDto } from './dto/get-recommendations.dto';
 
 @Controller('wishlist')
 @UseGuards(JwtGuard)
@@ -18,6 +19,15 @@ export class WishlistController {
         @Query() query:GetWishlistDto,
     ){
         return this.wishlistService.getWishlist(userId,query);
+    }
+
+    @Get("recommendations")
+    @HttpCode(HttpStatus.OK)
+    async getRecommendations(
+        @GetUser("id") userId:string,
+        @Query() query:GetRecommendationsDto
+    ){
+        return this.wishlistService.getRecommendations(userId,query.limit??12);
     }
 
     @Get("ids")
@@ -53,6 +63,7 @@ export class WishlistController {
     ){
         return this.wishlistService.clearWishlist(userId)
     }
+    
 
 
 }
