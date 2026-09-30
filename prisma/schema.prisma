@@ -20,6 +20,7 @@ model User {
   isVerified      Boolean   @default(false) @map("is_verified")
   isActive        Boolean   @default(true) @map("is_active")
   wishlist        WishlistItem[]
+  CartItems       CartItem[]
 
   lastLogin       DateTime? @map("last_login")
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -102,6 +103,7 @@ model Product {
   offers       OfferProduct[]
 
   variants     ProductVariant[]
+  cartItems    CartItem[]
 
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt      @map("updated_at")
@@ -124,6 +126,8 @@ model ProductVariant{
 
   createdAt     DateTime @default(now())  @map("created_at")
   updatedAt     DateTime @updatedAt       @map("updated_at")
+
+  cartItems     CartItem[]
 
   @@unique([productId,color,variant])
   @@map("product_variants")
@@ -325,5 +329,26 @@ model FaqItem{
 
   @@index([order])
   @@map("faq_items")
+}
+
+model CartItem {
+  id        String @id @default(uuid())
+
+  userId    String @map("user_id")
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId String @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String? @map("variant_id")
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  quantity  Int @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, productId, variantId])
+  @@map("cart_items")
 }
 
