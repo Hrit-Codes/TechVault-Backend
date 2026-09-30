@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OffersService } from '../offers/offers.service';
 import { attachOfferInfo, withComputedIsNew, withEffectivePrice, withEffectiveStock } from '../products/utils/product-decorators';
@@ -149,6 +149,68 @@ export class WishlistService {
 
         return {
             message:"Wishlist cleared"
+        }
+    }
+
+
+    async getRecommendations(userId:string,limit=12){
+        const items=await this.prismaService.wishlistItem.findMany({
+            where:{userId},
+            select:{
+                productId:true,
+                product:{select:{categoryId:true, brandId:true}}
+            }
+        });
+
+        if(items.length===0){
+            return new BadRequestException("Please add items into wishlist first.");
+        }
+
+        const excludeIds=items.map((i)=>i.productId);
+
+        const categoryIds=Array.from(new Set(items.map((i)=>i.product.categoryId)));
+        const brandIds=Array.from(new Set(items.map((i)=>i.product.brandId)));
+
+        const candidates=await this.prismaService.product.findMany({
+            where:{
+                isActive:true,
+                id:{notIn:excludeIds},
+                OR:[
+                    {categoryId:{in:categoryIds}},
+                    {brandId:{in:brandIds}}
+                ]
+            },
+            orderBy:[{rating:"desc"},{createdAt:"asc"}],
+            take:limit,
+            select:{
+                id:true,
+                name:true,
+                description:true,
+                slug:true,
+                price:true,
+                salePrice:true,
+                onSale:true,
+                images:true,
+                badge:true,
+                freeShipping:true,
+                rating:true,
+                reviewCount:true,
+                createdAt:true,
+                stock:true,
+                categoryId:true,
+                brandId:true,
+                variants:{
+                    select:{isActive:true, priceOverride:true,stockOverride:true}
+                }
+            }
+        });
+
+        const activeOffers=await this.offersService.getActiveOffersForResolution();
+        const decorated=candidates.map((p)=>attachOfferInfo(withComputedIsNew(withEffectivePrice(withEffectiveStock(p))),activeOffers));
+
+        return{
+            message:"Recommendations fetched successfully",
+            data:decorated
         }
     }
 }
