@@ -18,6 +18,7 @@ import { CompanyInfoModule } from './company-info/company-info.module';
 import { HeroSectionsModule } from './hero-sections/hero-sections.module';
 import { AboutUsModule } from './about-us/about-us.module';
 import { CartModule } from './cart/cart.module';
+import { NewsletterModule } from './newsletter/newsletter.module';
 
 @Module({
   imports: [
@@ -39,7 +40,8 @@ import { CartModule } from './cart/cart.module';
     CompanyInfoModule,
     HeroSectionsModule,
     AboutUsModule,
-    CartModule
+    CartModule,
+    NewsletterModule
   ],
   controllers: [],
 })

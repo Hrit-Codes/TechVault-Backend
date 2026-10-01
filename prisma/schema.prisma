@@ -352,3 +352,16 @@ model CartItem {
   @@map("cart_items")
 }
 
+model Subscriber{
+  id        String @id @default(uuid())
+  email     String @unique
+  isActive  Boolean @default(true) @map("is_active")
+  unsubscribeToken String @unique @default(uuid()) @map("unsubscribe_token")
+
+  subscribedAt DateTime @default(now()) @map("subscribed_at")
+  unsubscribedAt DateTime? @map("unsubscribed_at")
+
+  @@map("subscribers")
+}
+
+
