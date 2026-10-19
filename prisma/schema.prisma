@@ -7,24 +7,24 @@ datasource db {
 }
 
 model User {
-  id              String    @id @default(uuid())
-  fullName        String    @map("full_name")
-  avatar          String?
-  email           String    @unique
-  phoneNumber     String    @unique @map("phone_number")
-  googleId        String?   @unique @map("google_id")
-  password        String
-  refreshToken    String?   @map("refresh_token")
-  defaultAddress  Json?     @map("default_address")
-  role            Role      @default(USER)
-  isVerified      Boolean   @default(false) @map("is_verified")
-  isActive        Boolean   @default(true) @map("is_active")
-  wishlist        WishlistItem[]
-  CartItems       CartItem[]
+  id             String         @id @default(uuid())
+  fullName       String         @map("full_name")
+  avatar         String?
+  email          String         @unique
+  phoneNumber    String         @unique @map("phone_number")
+  googleId       String?        @unique @map("google_id")
+  password       String
+  refreshToken   String?        @map("refresh_token")
+  defaultAddress Json?          @map("default_address")
+  role           Role           @default(USER)
+  isVerified     Boolean        @default(false) @map("is_verified")
+  isActive       Boolean        @default(true) @map("is_active")
+  wishlist       WishlistItem[]
+  CartItems      CartItem[]
 
-  lastLogin       DateTime? @map("last_login")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  lastLogin DateTime? @map("last_login")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
 }
@@ -36,18 +36,18 @@ enum Role {
 
 model Category {
   id        String   @id @default(uuid())
-  name      String   @unique 
+  name      String   @unique
   subtitle  String
   image     String
   slug      String   @unique
-  isActive  Boolean  @default(true)  
-  order     Int      @default(1)     
+  isActive  Boolean  @default(true)
+  order     Int      @default(1)
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at") 
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  products  Product[] 
+  products Product[]
 
-  offers    OfferCategory[]
+  offers OfferCategory[]
 
   @@map("categories")
 }
@@ -57,196 +57,195 @@ model Brand {
   name      String   @unique
   logo      String?
   slug      String   @unique
-  isActive  Boolean  @default(true)  @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")   
-  updatedAt DateTime @updatedAt      @map("updated_at")   
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  products  Product[]
+  products Product[]
 
-  offers    OfferBrand[]
+  offers OfferBrand[]
 
   @@map("brands")
 }
 
 model Product {
-  id           String   @id @default(uuid())
-  name         String
-  slug         String   @unique
-  description  String
-  price        Float
-  salePrice    Float?
-  onSale       Boolean  @default(false) @map("on_sale")
+  id          String  @id @default(uuid())
+  name        String
+  slug        String  @unique
+  description String
+  price       Float
+  salePrice   Float?
+  onSale      Boolean @default(false) @map("on_sale")
 
-  images       String[]
+  images String[]
 
   badge        String?
-  isActive     Boolean  @default(true)  @map("is_active")  
-  freeShipping Boolean  @default(false) @map("free_shipping")
+  isActive     Boolean @default(true) @map("is_active")
+  freeShipping Boolean @default(false) @map("free_shipping")
 
-  wishlist     WishlistItem[]
+  wishlist WishlistItem[]
 
-  trustBadges  String[] @map("trust_badges")
+  trustBadges String[] @map("trust_badges")
 
-  stock        Int      @default(0)
-  rating       Float    @default(0)
-  reviewCount  Int      @default(0)     @map("review_count")
+  stock          Int      @default(0)
+  rating         Float    @default(0)
+  reviewCount    Int      @default(0) @map("review_count")
   specifications Json?
-  features     String[]
-  
-  categoryId   String   @map("category_id")
-  brandId      String   @map("brand_id")
+  features       String[]
 
-  category     Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  brand        Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  reviews      Review[]
+  categoryId String @map("category_id")
+  brandId    String @map("brand_id")
 
-  offers       OfferProduct[]
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  brand    Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  reviews  Review[]
 
-  variants     ProductVariant[]
-  cartItems    CartItem[]
+  offers OfferProduct[]
 
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt      @map("updated_at")
+  variants  ProductVariant[]
+  cartItems CartItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("products")
 }
 
-model ProductVariant{
-  id            String   @id @default(uuid())
-  productId     String   @map("product_id")
-  product       Product  @relation(fields:[productId],references:[id],onDelete:Cascade)
-  color         String?
-  variant       String?
+model ProductVariant {
+  id        String  @id @default(uuid())
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  color     String?
+  variant   String?
 
+  priceOverride Float? @map("price_override")
+  stockOverride Int?   @map("stock_override")
 
-  priceOverride Float?   @map("price_override")
-  stockOverride Int?     @map("stock_override")
+  isActive Boolean @default(true) @map("is_active")
 
-  isActive      Boolean  @default(true)   @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  createdAt     DateTime @default(now())  @map("created_at")
-  updatedAt     DateTime @updatedAt       @map("updated_at")
+  cartItems CartItem[]
 
-  cartItems     CartItem[]
-
-  @@unique([productId,color,variant])
+  @@unique([productId, color, variant])
   @@map("product_variants")
 }
 
 model Review {
-  id        String   @id @default(uuid())  
+  id        String   @id @default(uuid())
   name      String
   rating    Int
   text      String
-  createdAt DateTime @default(now())  @map("created_at")
-  updatedAt DateTime @updatedAt       @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  productId String   @map("product_id")
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)  
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
   @@map("reviews")
 }
 
-model WishlistItem{
-  id       String   @id              @default(uuid())
+model WishlistItem {
+  id        String   @id @default(uuid())
   userId    String
   productId String
   createdAt DateTime @default(now()) @map("created_at")
 
-  user      User     @relation(fields:[userId], references:[id], onDelete:Cascade)
-  product   Product  @relation(fields:[productId], references:[id], onDelete:Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@unique([userId,productId])
+  @@unique([userId, productId])
   @@map("wishlist_items")
 }
 
-enum OfferType{
-  PERCENTAGE 
+enum OfferType {
+  PERCENTAGE
   FIXED
 }
 
-model Offer{
-  id               String     @id @default(uuid())
-  title            String     
-  description      String?
-  bannerImage      String     @map("banner_image")
-  offerType        OfferType  @map("offer_type")
-  offerValue       Float      @map("offer_value")
+model Offer {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  bannerImage String    @map("banner_image")
+  offerType   OfferType @map("offer_type")
+  offerValue  Float     @map("offer_value")
 
-  startDate        DateTime   @map("start_date")
-  endDate          DateTime   @map("end_date")
-  isActive         Boolean    @default(true)        @map("is_active")
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+  isActive  Boolean  @default(true) @map("is_active")
 
-  products         OfferProduct[]
-  brands           OfferBrand[]
-  categories       OfferCategory[]
+  products   OfferProduct[]
+  brands     OfferBrand[]
+  categories OfferCategory[]
 
-  heroSections     HeroSection[]
+  heroSections HeroSection[]
 
-  createdAt        DateTime   @default(now())       @map("created_at")
-  updatedAt        DateTime   @updatedAt            @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("offers") 
+  @@map("offers")
 }
 
-model OfferProduct{
-  id               String     @id    @default(uuid())
-  offerId          String     @map("offer_id")
-  productId        String     @map("product_id")
+model OfferProduct {
+  id        String @id @default(uuid())
+  offerId   String @map("offer_id")
+  productId String @map("product_id")
 
-  offer            Offer      @relation(fields:[offerId], references:[id], onDelete:Cascade)
-  product          Product    @relation(fields:[productId],references:[id], onDelete:Cascade)
+  offer   Offer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-
-  @@unique([offerId,productId])
+  @@unique([offerId, productId])
   @@map("offer_products")
 }
 
-model OfferBrand{
-  id               String     @id    @default(uuid())
-  offerId          String     @map("offer_id")
-  brandId          String     @map("brand_id")
+model OfferBrand {
+  id      String @id @default(uuid())
+  offerId String @map("offer_id")
+  brandId String @map("brand_id")
 
-  offer            Offer      @relation(fields:[offerId], references:[id], onDelete:Cascade)
-  brand            Brand      @relation(fields:[brandId], references:[id],onDelete:Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
   @@unique([offerId, brandId])
-  @@map("offer_brands")   
+  @@map("offer_brands")
 }
 
-model OfferCategory{
-  id               String      @id     @default(uuid())
-  offerId          String      @map("offer_id")
-  categoryId       String      @map("category_id")
+model OfferCategory {
+  id         String @id @default(uuid())
+  offerId    String @map("offer_id")
+  categoryId String @map("category_id")
 
-  offer            Offer       @relation(fields:[offerId], references:[id],onDelete:Cascade)
-  category         Category    @relation(fields:[categoryId],references:[id],onDelete:Cascade)
+  offer    Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([offerId, categoryId])
   @@map("offer_categories")
 }
 
-model CompanyInfo{
-  id               String    @id @default(uuid())
-  companyName      String    @map("company_name")
-  officeAddress    String    @map("office_address")
-  officeTelephone  String    @map("office_telephone")
+model CompanyInfo {
+  id              String @id @default(uuid())
+  companyName     String @map("company_name")
+  officeAddress   String @map("office_address")
+  officeTelephone String @map("office_telephone")
 
-  emails           String[]
-  phones           String[]
+  emails String[]
+  phones String[]
 
-  description      String
+  description String
 
-  logo             String
+  logo String
 
-  socialLinks      Json?      @map("social_links")
+  socialLinks Json? @map("social_links")
 
-  mapLatitude      Float      @map("map_latitude")
-  mapLongitude     Float      @map("map_longitude")
+  mapLatitude  Float @map("map_latitude")
+  mapLongitude Float @map("map_longitude")
 
-  mapEmbedUrl      String?    @map("map_embeded_url")
+  mapEmbedUrl String? @map("map_embeded_url")
 
-  createdAt        DateTime   @default(now())   @map("created_at")
-  updatedAt        DateTime   @updatedAt        @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("company_info")
 }
@@ -258,92 +257,92 @@ enum TextAlignment {
 }
 
 model HeroSection {
-  id                  String        @id @default(uuid())
+  id String @id @default(uuid())
 
-  eyebrow             String?
-  headingLine1        String?        @map("heading_line_1")
-  headingLine2        String?        @map("heading_line_2")
-  description         String?
+  eyebrow      String?
+  headingLine1 String? @map("heading_line_1")
+  headingLine2 String? @map("heading_line_2")
+  description  String?
 
-  primaryButtonText   String?       @map("primary_button_text")
-  primaryButtonLink   String?       @map("primary_button_link")
+  primaryButtonText String? @map("primary_button_text")
+  primaryButtonLink String? @map("primary_button_link")
 
-  secondaryButtonText String?       @map("secondary_button_text")
-  secondaryButtonLink String?       @map("secondary_button_link")
+  secondaryButtonText String? @map("secondary_button_text")
+  secondaryButtonLink String? @map("secondary_button_link")
 
-  linkedOfferId       String?       @map("linked_offer_id")
-  linkedOffer         Offer?        @relation(fields: [linkedOfferId], references: [id], onDelete: SetNull)
+  linkedOfferId String? @map("linked_offer_id")
+  linkedOffer   Offer?  @relation(fields: [linkedOfferId], references: [id], onDelete: SetNull)
 
-  mediaUrl            String        @map("media_url")
-  mediaPublicId       String        @map("media_public_id")
+  mediaUrl      String @map("media_url")
+  mediaPublicId String @map("media_public_id")
 
-  textAlignment       TextAlignment @default(LEFT) @map("text_alignment")
+  textAlignment TextAlignment @default(LEFT) @map("text_alignment")
 
-  overlayColor        String?       @default("#000000") @map("overlay_color")
-  overlayOpacity      Int           @default(0) @map("overlay_opacity")
+  overlayColor   String? @default("#000000") @map("overlay_color")
+  overlayOpacity Int     @default(0) @map("overlay_opacity")
 
-  isActive            Boolean       @default(true) @map("is_active")
-  order               Int           @default(0)
+  isActive Boolean @default(true) @map("is_active")
+  order    Int     @default(0)
 
-  createdAt           DateTime      @default(now()) @map("created_at")
-  updatedAt           DateTime      @updatedAt      @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([order])
   @@map("hero_sections")
 }
 
-model AboutUsStory{
-  id                  String    @id                @default(uuid())
-  eyebrow             String    
-  heading             String
-  paragraph           String
-  tagline             String    
-  image               String?
-  imagePublicId       String?   @map("image_public_id")
-  createdAt           DateTime  @default(now())     @map("created_at")
-  updatedAt           DateTime  @updatedAt          @map("updated_at")
-  
+model AboutUsStory {
+  id            String   @id @default(uuid())
+  eyebrow       String
+  heading       String
+  paragraph     String
+  tagline       String
+  image         String?
+  imagePublicId String?  @map("image_public_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
   @@map("about_us_story")
 }
 
-model PromiseItem{
-  id                  String    @id @default(uuid())
-  title               String
-  description         String
-  icon                String    @default("CheckCircle")
-  order               Int       @default(0)
-  createdAt           DateTime  @default(now())     @map("created_at")
-  updatedAt           DateTime  @updatedAt          @map("updated_at")
+model PromiseItem {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  icon        String   @default("CheckCircle")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@index([order])
-  @@map("promise_items") 
+  @@map("promise_items")
 }
 
-model FaqItem{
-  id                  String    @id @default(uuid())
-  question            String    
-  answer              String
-  order               Int       @default(0)
-  createdAt           DateTime  @default(now())     @map("created_at")
-  updatedAt           DateTime  @updatedAt          @map("updated_at")
+model FaqItem {
+  id        String   @id @default(uuid())
+  question  String
+  answer    String
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([order])
   @@map("faq_items")
 }
 
 model CartItem {
-  id        String @id @default(uuid())
+  id String @id @default(uuid())
 
-  userId    String @map("user_id")
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  productId String @map("product_id")
+  productId String  @map("product_id")
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  variantId String? @map("variant_id")
+  variantId String?         @map("variant_id")
   variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
-  quantity  Int @default(1)
+  quantity Int @default(1)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -352,16 +351,43 @@ model CartItem {
   @@map("cart_items")
 }
 
-model Subscriber{
-  id        String @id @default(uuid())
-  email     String @unique
-  isActive  Boolean @default(true) @map("is_active")
-  unsubscribeToken String @unique @default(uuid()) @map("unsubscribe_token")
+model Subscriber {
+  id               String  @id @default(uuid())
+  email            String  @unique
+  isActive         Boolean @default(true) @map("is_active")
+  unsubscribeToken String  @unique @default(uuid()) @map("unsubscribe_token")
 
-  subscribedAt DateTime @default(now()) @map("subscribed_at")
+  subscribedAt   DateTime  @default(now()) @map("subscribed_at")
   unsubscribedAt DateTime? @map("unsubscribed_at")
 
   @@map("subscribers")
 }
 
+enum CampaignStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
 
+model Campaign {
+  id              String         @id @default(uuid())
+  subject         String
+  body            String
+  sentByEmail     String         @map("sent_by_email")
+  status          CampaignStatus @default(PENDING)
+  totalRecipients Int            @default(0) @map("total_recipients")
+  successCount    Int            @default(0) @map("success_count")
+  failureCount    Int            @default(0) @map("failure_count")
+
+  attachments Json
+
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("campaigns")
+}

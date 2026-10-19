@@ -19,6 +19,9 @@ import { HeroSectionsModule } from './hero-sections/hero-sections.module';
 import { AboutUsModule } from './about-us/about-us.module';
 import { CartModule } from './cart/cart.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
+import { CampaignModule } from './campaign/campaign.module';
+import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -41,7 +44,15 @@ import { NewsletterModule } from './newsletter/newsletter.module';
     HeroSectionsModule,
     AboutUsModule,
     CartModule,
-    NewsletterModule
+    NewsletterModule,
+    CampaignModule,
+    ScheduleModule.forRoot(),
+    BullModule.forRoot({
+      connection:{
+        host:process.env.REDIS_HOST || "127.0.0.1",
+        port:Number(process.env.REDIS_PORT) || 6379
+      }
+    })
   ],
   controllers: [],
 })
