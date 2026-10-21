@@ -1,4 +1,4 @@
-type EmailLayoutOptions = {
+export type EmailLayoutOptions = {
   badge: string;
   heading: string;
   intro: string;
@@ -6,9 +6,10 @@ type EmailLayoutOptions = {
   cta?: { label: string; url: string };
   footnote: string;
   unsubscribeUrl?: string;
+  subFooter?: string;
 };
 
-const layout = ({
+export const layout = ({
   badge,
   heading,
   intro,
@@ -16,6 +17,7 @@ const layout = ({
   cta,
   footnote,
   unsubscribeUrl,
+  subFooter,
 }: EmailLayoutOptions): string => {
   return `
   <!DOCTYPE html>
@@ -206,7 +208,10 @@ const layout = ({
             class="text-subtle"
             style="margin:20px auto 0; max-width:520px; color:#9ca3af; font-size:12px; line-height:1.6; text-align:center;"
           >
-            This email was sent to you because you subscribed to the TechVault newsletter.
+            ${
+              subFooter ??
+              'This email was sent to you because you subscribed to the TechVault newsletter.'
+            }
           </p>
         </td>
       </tr>
