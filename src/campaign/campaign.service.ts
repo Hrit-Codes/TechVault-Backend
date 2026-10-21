@@ -2,7 +2,6 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { SendCampaignDto } from './dto/send-campaign.dto';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Queue } from 'bullmq';
 import { CampaignAttachment, MAX_ATTACHMENTS } from './campaign.constants';
 import { QueryCampaignsDto } from './dto/query-campaigns.dto';
@@ -81,7 +80,13 @@ export class CampaignService {
                 body:dto.body.trim(),
                 unsubscribeToken:subscriber.unsubscribeToken,
                 attachments,
-            } satisfies EmailJobData
+            } satisfies EmailJobData,
+            opts:{
+                attempts:3,
+                backoff:{type:"exponential",delay:5_000},
+                removeOnComplete:{age:3600,count:1000},
+                removeOnFail:{age:24*3600},
+            }
         }))
 
         await this.emailQueue.addBulk(jobs);
@@ -135,7 +140,7 @@ export class CampaignService {
                 page,
                 limit,
                 totalPages,
-                hasNextPage:page>totalPages,
+                hasNextPage:page<totalPages,
                 hasPrevPage:page>1
             }
         }

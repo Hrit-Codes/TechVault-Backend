@@ -12,13 +12,15 @@ import { EmailJobData } from "./campaign.service";
 const MAX_ATTEMPTS = 3;
 const MAX_CACHE_ENTRIES = 20;
 
-@Processor("email-campaign", { concurrency: 5 })
+@Processor("email-campaign", {
+  concurrency: 5,
+  lockDuration: 120_000,
+  stalledInterval: 30_000,
+  maxStalledCount: 2,
+})
 export class CampaignEmailProcessor extends WorkerHost {
   private readonly logger = new Logger(CampaignEmailProcessor.name);
 
-  // Files read from disk are cached here for the duration of the process.
-  // A 5,000-subscriber campaign with 3 attachments reads them once each
-  // from disk instead of 15,000 times.
   private readonly attachmentCache = new Map<string, Buffer>();
 
   constructor(
@@ -60,9 +62,6 @@ export class CampaignEmailProcessor extends WorkerHost {
       html: this.renderHtml(body, unsubscribeUrl),
       attachments: mailAttachments,
     });
-
-    // Use updateMany so we don't throw if the campaign was deleted by
-    // the cleanup cron between queuing and this job firing.
     await this.prisma.campaign.updateMany({
       where: { id: campaignId },
       data: { successCount: { increment: 1 } },

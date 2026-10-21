@@ -22,6 +22,8 @@ import { NewsletterModule } from './newsletter/newsletter.module';
 import { CampaignModule } from './campaign/campaign.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
+import { OrdersModule } from './orders/orders.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -52,7 +54,9 @@ import { ScheduleModule } from '@nestjs/schedule';
         host:process.env.REDIS_HOST || "127.0.0.1",
         port:Number(process.env.REDIS_PORT) || 6379
       }
-    })
+    }),
+    OrdersModule,
+    PaymentsModule
   ],
   controllers: [],
 })
