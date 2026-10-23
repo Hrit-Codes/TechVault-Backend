@@ -8,6 +8,10 @@ import { resolveBestOfferForProduct } from '../products/utils/product-decorators
 import { MailerService } from '../mailer/mailer.service';
 import { ConfigService } from '@nestjs/config';
 import { orderShippedTemplate } from '../template/orderShippedTemplate';
+import { RedisService } from '../redis/redis.service';
+
+const ORDERS_STATS_CACHE_KEY="orders:stats";
+const ORDERS_STATS_TTL=60;
 
 @Injectable()
 export class OrdersService {
@@ -27,6 +31,7 @@ export class OrdersService {
         private readonly offersService: OffersService,
         private readonly mailerService: MailerService,
         private readonly configService: ConfigService,
+        private readonly redisService: RedisService,
     ) {}
 
     /**
@@ -120,7 +125,7 @@ export class OrdersService {
 
         // We use a transaction to ensure stock deduction, order creation and
         // cart clearing are atomic
-        return this.prisma.$transaction(async (tx) => {
+        const result=await this.prisma.$transaction(async (tx) => {
             // 1. Deduct stock atomically — only if still in stock, preventing overselling
             for (const item of orderItemsData) {
                 if (item.variantId) {
@@ -169,6 +174,9 @@ export class OrdersService {
 
             return { message: 'Order created successfully', data: order };
         });
+
+        await this.redisService.del(ORDERS_STATS_CACHE_KEY);
+        return result;
     }
 
     async refundOrder(orderId: string) {
@@ -216,6 +224,8 @@ export class OrdersService {
                 }
             }
         });
+
+        await this.redisService.del(ORDERS_STATS_CACHE_KEY);
 
         return {
             message: 'Order refunded / cancelled and stock restored',
@@ -426,6 +436,88 @@ export class OrdersService {
             }
         }
 
+        await this.redisService.del(ORDERS_STATS_CACHE_KEY);
         return { message: 'Order status updated successfully', data: updatedOrder };
+    }
+
+    async deletePendingOrder(orderId:string){
+        const order=await this.prisma.order.findUnique({
+            where:{id:orderId},
+            include:{items:true}
+        });
+
+        if(!order) throw new NotFoundException("Order not found");
+
+        if(order.status!==OrderStatus.PENDING){
+            throw new BadRequestException("Cannot delete an order that is already being processed or paid");
+        }
+
+        await this.prisma.$transaction(async(tx)=>{
+            for(const item of order.items){
+                if(item.variantId){
+                    await tx.productVariant.update({
+                        where:{id:item.variantId},
+                        data:{stockOverride:{increment:item.quantity}},
+                    });
+                }else{
+                    await tx.product.update({
+                        where:{id:item.productId},
+                        data:{stock:{increment:item.quantity}}
+                    })
+                }
+            }
+
+            await tx.order.delete({where:{id:orderId}});
+        })
+
+        await this.redisService.del(ORDERS_STATS_CACHE_KEY);
+
+        return {
+            message:"Order deleted and stock restored"
+        }
+    }
+
+    async getOrderStats(){
+        const cached=await this.redisService.get<any>(ORDERS_STATS_CACHE_KEY);
+        if(cached){
+            return{
+                message:"Order statistics fetched successfully",
+                data:cached
+            }
+        }
+
+        const [totalOrders, pendingOrders, returnsAndVoids, processingOrders, shippedOrders, revenueData]=await Promise.all([
+            this.prisma.order.count(),
+            this.prisma.order.count({where:{status:OrderStatus.PENDING}}),
+            this.prisma.order.count({
+                where:{status:{in:[OrderStatus.CANCELLED, OrderStatus.REFUNDED]}}
+            }),
+            this.prisma.order.count({
+                where:{status:OrderStatus.PROCESSING}
+            }),
+            this.prisma.order.count({
+                where:{status:OrderStatus.SHIPPED}
+            }),
+            this.prisma.order.aggregate({
+                where:{paymentStatus:PaymentStatus.PAID},
+                _sum:{totalAmount:true}
+            })
+        ]);
+
+        const stats={
+            totalOrders,
+            pendingOrders,
+            returnsAndVoids,
+            processing:processingOrders,
+            shipped:shippedOrders,
+            collectedRevenue:revenueData._sum.totalAmount??0
+        }
+
+        await this.redisService.set(ORDERS_STATS_CACHE_KEY,stats,ORDERS_STATS_TTL);
+
+        return{
+            message:"Order statistics fetched successfully",
+            data:stats
+        }
     }
 }
