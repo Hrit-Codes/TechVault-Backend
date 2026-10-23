@@ -16,6 +16,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
 import { OffersModule } from './offers/offers.module';
 import { CompanyInfoModule } from './company-info/company-info.module';
 import { HeroSectionsModule } from './hero-sections/hero-sections.module';
+import { PromotionalBannersModule } from './promotional-banners/promotional-banners.module';
 import { AboutUsModule } from './about-us/about-us.module';
 import { CartModule } from './cart/cart.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
@@ -44,6 +45,7 @@ import { PaymentsModule } from './payments/payments.module';
     OffersModule,
     CompanyInfoModule,
     HeroSectionsModule,
+    PromotionalBannersModule,
     AboutUsModule,
     CartModule,
     NewsletterModule,
