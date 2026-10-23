@@ -1,6 +1,9 @@
 import { 
   Body, Controller, Post, Patch, Get, Param, Query, 
-  UseGuards 
+  UseGuards, 
+  Delete,
+  HttpCode,
+  HttpStatus
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -52,6 +55,14 @@ export class OrdersController {
     return this.ordersService.refundOrder(id);
   }
 
+  @Get('admin/stats')
+  @UseGuards(JwtGuard,RolesGuard)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getProductStats(){
+    return this.ordersService.getOrderStats()
+  }
+
   // ─── SHARED ROUTE ───────────────────────────────────────
 
   @Get(':id')
@@ -62,5 +73,12 @@ export class OrdersController {
   ) {
     const isAdmin = role === Role.ADMIN;
     return this.ordersService.getOrderById(id, userId, isAdmin);
+  }
+
+  @Delete(":id/abandon")
+  async abandonOrder(
+    @Param("id") id:string
+  ){
+    return this.ordersService.deletePendingOrder(id);
   }
 }
