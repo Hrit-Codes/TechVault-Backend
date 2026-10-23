@@ -9,6 +9,8 @@ import { RedisService } from '../redis/redis.service';
 const HEROS_CACHE_KEY="heros:all";
 const HEROS_ACTIVE_CACHE_KEY="heros:active";
 const HEROS_CACHE_TTL=30*60;
+const MIN_HEROS = 2;
+const MAX_HEROS = 5;
 
 @Injectable()
 export class HeroSectionsService {
@@ -24,11 +26,6 @@ export class HeroSectionsService {
       keysToDelete.push(`heros:id:${id}`);
     }
     await this.redisService.del(...keysToDelete);
-  }
-
-  private extractPublicId(url: string, folder: string): string | null {
-    const filename = url.split('/').pop()?.split('.')[0];
-    return filename ? `${folder}/${filename}` : null;
   }
 
   // ─── PUBLIC ────────────────────────────────────────────────
@@ -116,6 +113,11 @@ export class HeroSectionsService {
       throw new BadRequestException('A media file (image) is required for a hero section');
     }
 
+    const count=await this.prisma.heroSection.count();
+    if(count>=MAX_HEROS){
+      throw new BadRequestException(`You can have at most ${MAX_HEROS} hero sections`);
+    }
+
     if (dto.linkedOfferId) {
       const offer = await this.prisma.offer.findUnique({
         where: { id: dto.linkedOfferId },
@@ -151,26 +153,33 @@ export class HeroSectionsService {
       order = lastSection ? lastSection.order + 1 : 0;
     }
 
-    const section = await this.prisma.heroSection.create({
-      data: {
-        eyebrow: dto.eyebrow,
-        headingLine1: dto.headingLine1,
-        headingLine2: dto.headingLine2,
-        description: dto.description,
-        primaryButtonText: dto.primaryButtonText,
-        primaryButtonLink: dto.primaryButtonLink,
-        secondaryButtonText: dto.secondaryButtonText,
-        secondaryButtonLink: dto.secondaryButtonLink,
-        linkedOfferId: dto.linkedOfferId,
-        mediaUrl: uploaded.secure_url,
-        mediaPublicId: mediaPublicId,
-        textAlignment: dto.textAlignment as TextAlignment,
-        overlayColor: dto.overlayColor,
-        overlayOpacity: dto.overlayOpacity,
-        isActive: dto.isActive,
-        order: order,
-      },
-      include: { linkedOffer: true },
+    const section = await this.prisma.$transaction(async(tx)=>{
+      await tx.heroSection.updateMany({
+        where:{ order:{ gte:order } },
+        data:{ order:{ increment: 1 } }
+      })
+
+      return tx.heroSection.create({
+        data: {
+          eyebrow: dto.eyebrow,
+          headingLine1: dto.headingLine1,
+          headingLine2: dto.headingLine2,
+          description: dto.description,
+          primaryButtonText: dto.primaryButtonText,
+          primaryButtonLink: dto.primaryButtonLink,
+          secondaryButtonText: dto.secondaryButtonText,
+          secondaryButtonLink: dto.secondaryButtonLink,
+          linkedOfferId: dto.linkedOfferId,
+          mediaUrl: uploaded.secure_url,
+          mediaPublicId: mediaPublicId,
+          textAlignment: dto.textAlignment as TextAlignment,
+          overlayColor: dto.overlayColor,
+          overlayOpacity: dto.overlayOpacity,
+          isActive: dto.isActive,
+          order: order,
+        },
+        include: { linkedOffer: true },
+      });
     });
 
     await this.clearHerosCache();
@@ -250,10 +259,31 @@ export class HeroSectionsService {
     updateData.mediaUrl = mediaUrl;
     updateData.mediaPublicId = mediaPublicId;
 
-    const section = await this.prisma.heroSection.update({
-      where: { id },
-      data: updateData,
-      include: { linkedOffer: true },
+    const section = await this.prisma.$transaction(async(tx)=>{
+      if(dto.order!==undefined && dto.order !==existing.order){
+        if(dto.order<existing.order){
+          await tx.heroSection.updateMany({
+            where:{
+              id:{ not:id },
+              order:{ gte: dto.order, lt:existing.order}
+            },
+            data:{ order: { increment: 1 } }
+          })
+        }else{
+          await tx.heroSection.updateMany({
+            where:{
+              id:{not:id},
+              order:{gt:existing.order, lte:dto.order}
+            },
+            data:{ order: { decrement:1 } }
+          })
+        }
+      }
+
+      return tx.heroSection.update({
+        where:{id},
+        data:updateData
+      })
     });
 
     await this.clearHerosCache(section.id);
@@ -293,6 +323,11 @@ export class HeroSectionsService {
 
     if (!section) {
       throw new NotFoundException('Hero section not found');
+    }
+
+    const count=await this.prisma.heroSection.count();
+    if(count<=MIN_HEROS){
+      throw new BadRequestException(`You must keep at least ${MIN_HEROS} hero sections`);
     }
 
     if (section.mediaPublicId) {
