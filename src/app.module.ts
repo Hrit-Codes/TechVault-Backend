@@ -25,6 +25,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -58,7 +59,8 @@ import { PaymentsModule } from './payments/payments.module';
       }
     }),
     OrdersModule,
-    PaymentsModule
+    PaymentsModule,
+    DashboardModule
   ],
   controllers: [],
 })
