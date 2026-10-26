@@ -217,27 +217,31 @@ export class CartService {
       },
     });
 
+    let cartItem: Awaited<ReturnType<typeof this.prisma.cartItem.create>>;
+
     if (existing) {
       const newQuantity = existing.quantity + quantity;
       if (availableStock < newQuantity) {
         throw new BadRequestException(`Only ${availableStock} left in stock`);
       }
-      await this.prisma.cartItem.update({
+      cartItem = await this.prisma.cartItem.update({
         where: { id: existing.id },
         data: { quantity: newQuantity },
+        include: cartItemInclude,
       });
     } else {
-      await this.prisma.cartItem.create({
+      cartItem = await this.prisma.cartItem.create({
         data: {
           userId,
           productId: dto.productId,
           variantId: dto.variantId ?? null,
           quantity,
         },
+        include: cartItemInclude,
       });
     }
 
-    return { message: 'Added to cart' };
+    return { message: 'Added to cart', data: cartItem };
   }
 
   async updateCartItem(
@@ -262,15 +266,15 @@ export class CartService {
       throw new BadRequestException(`Only ${availableStock} left in stock`);
     }
 
-    await this.prisma.cartItem.update({
+    const updatedItem = await this.prisma.cartItem.update({
       where: { id: cartItemId },
       data: { quantity: dto.quantity },
       include: cartItemInclude,
     });
 
-
     return {
       message: 'Cart item updated',
+      data: updatedItem,
     };
   }
 
