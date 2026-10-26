@@ -356,4 +356,28 @@ export class CategoriesService {
       data:stats
     }
   }
+
+  async exportCategories(){
+    const categories=await this.prisma.category.findMany({
+      orderBy:{order:"asc"}
+    });
+
+    if(!categories || categories.length===0){
+      return `ID,Name,Subtitle,Slug,Status,Order,Created At\n`
+    }
+
+    const headers=['ID','Name','Subtitle','Slug','Status','Order','Created At'];
+
+    const rows = categories.map((cat) => [
+      cat.id,
+      `"${cat.name}"`,
+      `"${cat.subtitle}"`,
+      cat.slug,
+      cat.isActive ? 'Active' : 'Inactive',
+      cat.order,
+      cat.createdAt.toISOString(),
+    ]);
+
+    return [headers.join(','), ...rows.map((row)=> row.join(','))].join("\n");
+  }
 }

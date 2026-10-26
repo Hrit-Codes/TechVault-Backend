@@ -3,11 +3,13 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
   Post,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -21,6 +23,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { multerConfig } from '../cloudinary/multer.config';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
+import type { Response } from 'express';
 
 @Controller('brands')
 export class BrandsController {
@@ -31,6 +34,17 @@ export class BrandsController {
   @HttpCode(HttpStatus.OK)
   async getActiveBrands() {
     return this.brandsService.getActiveBrands();
+  }
+
+  @Get("admin/export")
+  @UseGuards(JwtGuard,RolesGuard)
+  @Roles(Role.ADMIN)
+  @Header("Content-Type","text/csv")
+  @Header("Content-Disposition",`attachment; filename="brands-export.csv"`)
+  async exportBrands(@Res() res:Response){
+    const csvData=await this.brandsService.exportBrands();
+
+    res.send(csvData);
   }
 
   @Get(':slug')

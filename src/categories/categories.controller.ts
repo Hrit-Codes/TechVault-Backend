@@ -3,11 +3,13 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
   Post,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -21,6 +23,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { multerConfig } from '../cloudinary/multer.config';
 import { Role } from '@prisma/client';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import type { Response } from 'express';
 
 @Controller('categories')
 export class CategoriesController {
@@ -31,6 +34,17 @@ export class CategoriesController {
   @HttpCode(HttpStatus.OK)
   async getActiveCategories() {
     return this.categoriesService.getActiveCategories();
+  }
+
+  @Get("admin/export")
+  @UseGuards(JwtGuard,RolesGuard)
+  @Roles(Role.ADMIN)
+  @Header("Content-Type","text/csv")
+  @Header("Content-Disposition",`attachment; filename="categories-export.csv"`)
+  async exportCategories(@Res() res:Response){
+    const csvData=await this.categoriesService.exportCategories();
+
+    res.send(csvData);
   }
 
   @Get(':slug')

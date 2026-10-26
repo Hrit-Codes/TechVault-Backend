@@ -3,11 +3,13 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -24,6 +26,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import { QueryUsersDto } from './dto/query-users.dto';
+import type { Response } from 'express';
 
 @Controller('users')
 @UseGuards(JwtGuard, RolesGuard)
@@ -76,6 +79,16 @@ export class UsersController {
   }
 
   // ========== ADMIN ==========
+
+  @Get("admin/export")
+  @Roles(Role.ADMIN)
+  @Header("Content-Type","text/csv")
+  @Header("Content-Disposition",`attachment; filename="users-export.csv"`)
+  async exportUsers(@Res() res:Response){
+    const csvData=await this.usersService.exportUsers();
+
+    res.send(csvData);
+  }
 
   @Get('admin/all')
   @Roles(Role.ADMIN)
