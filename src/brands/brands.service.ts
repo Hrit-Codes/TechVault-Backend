@@ -4,6 +4,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
 import { RedisService } from '../redis/redis.service';
+import { head } from 'axios';
 
 const BRANDS_CACHE_KEY="brands:all";
 const BRANDS_ACTIVE_CACHE_KEY="brands:active";
@@ -280,6 +281,28 @@ export class BrandsService {
       message:"Brand statistics fetched succesfully",
       data:stats
     }
+  }
+
+  async exportBrands(){
+    const brands=await this.prisma.brand.findMany({
+    })
+
+    if(!brands || brands.length===0){
+      return `ID,Name,Slug,isActive,Created At, Updated At\n`
+    }
+
+    const headers=['ID','Name','Slug','isActive','CreatedAt','Updated At'];
+
+    const rows=brands.map((bra)=>[
+      bra.id,
+      `${bra.name}`,
+      bra.slug,
+      bra.isActive,
+      bra.createdAt.toISOString(),
+      bra.updatedAt.toISOString()
+    ]);
+
+    return [headers.join(','),...rows.map((row)=>row.join(','))].join("\n");
   }
   
 }

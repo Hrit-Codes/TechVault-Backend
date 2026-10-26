@@ -424,4 +424,30 @@ export class UsersService {
       },
     });
   }
+
+  async exportUsers(){
+    const users=await this.prisma.user.findMany({});
+
+    if(!users || users.length===0){
+      return 'ID, Fullname, Email, Phone Number, Default Address, Role, Is Verified, Is Active, Last Login, Created At, Updated At\n'
+    }
+
+    const headers=['ID','Fullname','Email','Phone Number','Default Address','Role','Is Verfied','Is Active','Last Login','Created At','Updated At'];
+
+    const rows=users.map((user)=>[
+      user.id,
+      user.fullName,
+      user.email,
+      user.phoneNumber,
+      user.defaultAddress,
+      user.role,
+      user.isVerified,
+      user.isActive,
+      user.lastLogin,
+      user.createdAt,
+      user.updatedAt
+    ])
+
+    return [headers.join(","),...rows.map((row)=>row.join(","))].join("\n");
+  }
 }
